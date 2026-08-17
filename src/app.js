@@ -4,31 +4,37 @@ const cors = require('cors');
 const authRoutes =
   require('./routes/auth.routes');
 
+const emprendimientoRoutes =
+  require('./routes/emprendimiento.routes');
+
+const categoriaRoutes =
+  require('./routes/categoria.routes');
+
+const productoRoutes =
+  require('./routes/producto.routes');
+
 
 const app = express();
 
 
 // =======================================
-// MIDDLEWARE
+// MIDDLEWARES
 // =======================================
 
 app.use(cors());
 
-app.use(
-  express.json()
-);
+app.use(express.json());
 
 
 // =======================================
-// RUTA DE PRUEBA
+// INICIO
 // =======================================
 
 app.get('/', (req, res) => {
-
   res.json({
     nombre: 'Mercalishuat API',
     estado: 'online',
-    version: 'Beta 1',
+    version: 'Beta 2',
   });
 });
 
@@ -42,16 +48,29 @@ app.use(
   authRoutes
 );
 
+app.use(
+  '/api/emprendimientos',
+  emprendimientoRoutes
+);
+
+app.use(
+  '/api/categorias',
+  categoriaRoutes
+);
+
+app.use(
+  '/api/productos',
+  productoRoutes
+);
+
 
 // =======================================
-// RUTA NO ENCONTRADA
+// 404
 // =======================================
 
 app.use((req, res) => {
-
   res.status(404).json({
-    message:
-      'Ruta no encontrada',
+    message: 'Ruta no encontrada',
   });
 });
 
