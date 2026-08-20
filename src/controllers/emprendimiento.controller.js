@@ -16,7 +16,7 @@ const crearEmprendimiento = async (req, res) => {
       correo_contacto,
     } = req.body;
 
-    if (!nombre || nombre.trim().isEmpty) {
+    if (!nombre || nombre.trim() === '') {
       return res.status(400).json({
         message: 'El nombre del emprendimiento es obligatorio',
       });
@@ -72,6 +72,7 @@ const crearEmprendimiento = async (req, res) => {
       message: 'Emprendimiento creado correctamente',
       emprendimiento: resultado.rows[0],
     });
+
   } catch (error) {
     console.error('Error creando emprendimiento:', error);
 
@@ -116,6 +117,7 @@ const obtenerMiEmprendimiento = async (req, res) => {
     return res.json({
       emprendimiento: resultado.rows[0],
     });
+
   } catch (error) {
     console.error('Error obteniendo emprendimiento:', error);
 
@@ -138,6 +140,7 @@ const obtenerEmprendimientoPorId = async (req, res) => {
       `
       SELECT
         e.id,
+        e.usuario_id,
         e.nombre,
         e.descripcion,
         e.telefono,
@@ -163,6 +166,7 @@ const obtenerEmprendimientoPorId = async (req, res) => {
     return res.json({
       emprendimiento: resultado.rows[0],
     });
+
   } catch (error) {
     console.error('Error obteniendo emprendimiento:', error);
 
@@ -180,51 +184,29 @@ const obtenerEmprendimientoPorId = async (req, res) => {
 const listarEmprendimientos = async (req, res) => {
   try {
     const resultado = await pool.query(
-       `
-  SELECT
-    p.id,
-    p.nombre,
-    p.descripcion,
-    p.precio,
-    p.disponible,
-    p.fecha_creacion,
-
-    c.id AS categoria_id,
-    c.nombre AS categoria,
-
-    (
-      SELECT i.url
-
-      FROM imagenes i
-
-      WHERE i.producto_id = p.id
-
-      ORDER BY
-        i.principal DESC,
-        i.id ASC
-
-      LIMIT 1
-    ) AS imagen_principal
-
-  FROM productos p
-
-  INNER JOIN categorias c
-    ON c.id = p.categoria_id
-
-  INNER JOIN emprendimientos e
-    ON e.id = p.emprendimiento_id
-
-  WHERE p.emprendimiento_id = $1
-    AND e.activo = TRUE
-
-  ORDER BY p.fecha_creacion DESC
-  `,
-  [emprendimientoId]
-);
+      `
+      SELECT
+        e.id,
+        e.usuario_id,
+        e.nombre,
+        e.descripcion,
+        e.telefono,
+        e.correo_contacto,
+        e.activo,
+        e.fecha_creacion,
+        u.nombre AS propietario
+      FROM emprendimientos e
+      INNER JOIN usuarios u
+        ON u.id = e.usuario_id
+      WHERE e.activo = TRUE
+      ORDER BY e.fecha_creacion DESC
+      `
+    );
 
     return res.json({
       emprendimientos: resultado.rows,
     });
+
   } catch (error) {
     console.error('Error listando emprendimientos:', error);
 
@@ -250,7 +232,7 @@ const editarEmprendimiento = async (req, res) => {
       correo_contacto,
     } = req.body;
 
-    if (!nombre || nombre.trim().isEmpty) {
+    if (!nombre || nombre.trim() === '') {
       return res.status(400).json({
         message: 'El nombre del emprendimiento es obligatorio',
       });
@@ -297,6 +279,7 @@ const editarEmprendimiento = async (req, res) => {
       message: 'Emprendimiento actualizado correctamente',
       emprendimiento: resultado.rows[0],
     });
+
   } catch (error) {
     console.error('Error actualizando emprendimiento:', error);
 
