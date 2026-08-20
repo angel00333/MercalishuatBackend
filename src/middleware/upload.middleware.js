@@ -1,34 +1,76 @@
 const multer = require('multer');
 
-const storage = multer.memoryStorage();
+const storage =
+  multer.memoryStorage();
 
-const filtroImagen = (req, file, cb) => {
-  const tiposPermitidos = [
-    'image/jpeg',
-    'image/png',
-    'image/webp',
-  ];
+const extensionesPermitidas = [
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.webp',
+];
 
-  if (!tiposPermitidos.includes(file.mimetype)) {
+const tiposPermitidos = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+];
+
+const filtroImagen = (
+  req,
+  file,
+  cb
+) => {
+  const nombre =
+    file.originalname.toLowerCase();
+
+  const extensionCorrecta =
+    extensionesPermitidas.some(
+      (extension) =>
+        nombre.endsWith(extension)
+    );
+
+  const tipoCorrecto =
+    tiposPermitidos.includes(
+      file.mimetype
+    );
+
+  // Algunos clientes web pueden mandar
+  // application/octet-stream aunque
+  // el archivo tenga extensión correcta.
+  const tipoGenerico =
+    file.mimetype ===
+    'application/octet-stream';
+
+  if (
+    extensionCorrecta &&
+    (tipoCorrecto ||
+      tipoGenerico)
+  ) {
     return cb(
-      new Error(
-        'Solo se permiten imágenes JPG, PNG o WEBP'
-      ),
-      false
+      null,
+      true
     );
   }
 
-  cb(null, true);
+  return cb(
+    new Error(
+      'Solo se permiten imágenes JPG, PNG o WEBP'
+    ),
+    false
+  );
 };
 
 const upload = multer({
   storage,
 
   limits: {
-    fileSize: 5 * 1024 * 1024,
+    fileSize:
+      5 * 1024 * 1024,
   },
 
-  fileFilter: filtroImagen,
+  fileFilter:
+    filtroImagen,
 });
 
 module.exports = upload;
