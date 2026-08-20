@@ -180,22 +180,47 @@ const obtenerEmprendimientoPorId = async (req, res) => {
 const listarEmprendimientos = async (req, res) => {
   try {
     const resultado = await pool.query(
-      `
-      SELECT
-        e.id,
-        e.nombre,
-        e.descripcion,
-        e.telefono,
-        e.correo_contacto,
-        e.fecha_creacion,
-        u.nombre AS propietario
-      FROM emprendimientos e
-      INNER JOIN usuarios u
-        ON u.id = e.usuario_id
-      WHERE e.activo = TRUE
-      ORDER BY e.fecha_creacion DESC
-      `
-    );
+       `
+  SELECT
+    p.id,
+    p.nombre,
+    p.descripcion,
+    p.precio,
+    p.disponible,
+    p.fecha_creacion,
+
+    c.id AS categoria_id,
+    c.nombre AS categoria,
+
+    (
+      SELECT i.url
+
+      FROM imagenes i
+
+      WHERE i.producto_id = p.id
+
+      ORDER BY
+        i.principal DESC,
+        i.id ASC
+
+      LIMIT 1
+    ) AS imagen_principal
+
+  FROM productos p
+
+  INNER JOIN categorias c
+    ON c.id = p.categoria_id
+
+  INNER JOIN emprendimientos e
+    ON e.id = p.emprendimiento_id
+
+  WHERE p.emprendimiento_id = $1
+    AND e.activo = TRUE
+
+  ORDER BY p.fecha_creacion DESC
+  `,
+  [emprendimientoId]
+);
 
     return res.json({
       emprendimientos: resultado.rows,

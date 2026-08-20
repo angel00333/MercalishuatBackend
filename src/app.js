@@ -13,6 +13,9 @@ const categoriaRoutes =
 const productoRoutes =
   require('./routes/producto.routes');
 
+const imagenRoutes =
+  require('./routes/imagen.routes');
+
 
 const app = express();
 
@@ -63,7 +66,41 @@ app.use(
   productoRoutes
 );
 
+app.use(
+  '/api/imagenes',
+  imagenRoutes
+);
 
+// =======================================
+// 404 Imagenes
+// =======================================
+app.use(
+  (error, req, res, next) => {
+
+    if (
+      error.code ===
+      'LIMIT_FILE_SIZE'
+    ) {
+
+      return res.status(400).json({
+        message:
+          'La imagen no puede superar los 5 MB',
+      });
+    }
+
+
+    if (error.message) {
+
+      return res.status(400).json({
+        message:
+          error.message,
+      });
+    }
+
+
+    next(error);
+  }
+);
 // =======================================
 // 404
 // =======================================
