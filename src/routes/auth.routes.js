@@ -4,6 +4,7 @@ const {
   registrar,
   login,
   perfil,
+  editarPerfil,
 } = require(
   '../controllers/auth.controller'
 );
@@ -36,5 +37,10 @@ router.get(
   perfil
 );
 
+router.put(
+  '/profile',
+  verificarToken,
+  editarPerfil
+);
 
 module.exports = router;

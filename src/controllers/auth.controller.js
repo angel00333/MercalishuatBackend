@@ -348,7 +348,85 @@ const perfil = async (req, res) => {
   }
 };
 
+const editarPerfil = async (req, res) => {
+  try {
+    const usuarioId = req.usuario.id;
 
+    const {
+      nombre,
+      correo,
+    } = req.body;
+
+    if (!nombre || nombre.trim() === '') {
+      return res.status(400).json({
+        message: 'El nombre es obligatorio',
+      });
+    }
+
+    if (!correo || correo.trim() === '') {
+      return res.status(400).json({
+        message: 'El correo es obligatorio',
+      });
+    }
+
+    const correoExistente = await pool.query(
+      `
+      SELECT id
+      FROM usuarios
+      WHERE LOWER(correo) = LOWER($1)
+        AND id <> $2
+      `,
+      [
+        correo.trim(),
+        usuarioId,
+      ]
+    );
+
+    if (correoExistente.rows.length > 0) {
+      return res.status(409).json({
+        message: 'Ese correo ya está registrado',
+      });
+    }
+
+    const resultado = await pool.query(
+      `
+      UPDATE usuarios
+
+      SET
+        nombre = $1,
+        correo = $2
+
+      WHERE id = $3
+
+      RETURNING
+        id,
+        nombre,
+        correo,
+        foto_perfil_url
+      `,
+      [
+        nombre.trim(),
+        correo.trim().toLowerCase(),
+        usuarioId,
+      ]
+    );
+
+    return res.json({
+      message: 'Perfil actualizado correctamente',
+      usuario: resultado.rows[0],
+    });
+
+  } catch (error) {
+    console.error(
+      'Error actualizando perfil:',
+      error
+    );
+
+    return res.status(500).json({
+      message: 'Error interno del servidor',
+    });
+  }
+};
 
 module.exports = {
   registrar,
