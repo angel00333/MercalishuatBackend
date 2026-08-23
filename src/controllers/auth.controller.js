@@ -432,4 +432,5 @@ module.exports = {
   registrar,
   login,
   perfil,
+  editarPerfil,
 };
