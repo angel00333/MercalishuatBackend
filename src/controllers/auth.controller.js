@@ -303,6 +303,7 @@ const perfil = async (req, res) => {
           u.id,
           u.nombre,
           u.correo,
+          u.foto_perfil_url,
           u.fecha_creacion,
           r.nombre AS rol
 

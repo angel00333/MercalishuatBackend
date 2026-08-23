@@ -18,8 +18,26 @@ const {
 
 const router = express.Router();
 
+const upload =
+  require(
+    '../middleware/upload.middleware'
+  );
+
+const {
+  subirImagenEmprendimiento,
+} = require(
+  '../controllers/emprendimiento_imagen.controller'
+);
 
 // Públicas
+router.post(
+  '/imagen',
+  verificarToken,
+  permitirRoles('emprendedor'),
+  upload.single('imagen'),
+  subirImagenEmprendimiento
+);
+
 router.get(
   '/',
   listarEmprendimientos

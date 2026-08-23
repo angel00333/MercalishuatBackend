@@ -139,7 +139,9 @@ const listarMisProductos = async (req, res) => {
     const usuarioId = req.usuario.id;
 
     const emprendimiento =
-      await obtenerEmprendimientoDelUsuario(usuarioId);
+        await obtenerEmprendimientoDelUsuario(
+          usuarioId
+        );
 
     if (!emprendimiento) {
       return res.json({
@@ -151,6 +153,8 @@ const listarMisProductos = async (req, res) => {
       `
       SELECT
         p.id,
+        p.emprendimiento_id,
+        p.categoria_id,
         p.nombre,
         p.descripcion,
         p.precio,
@@ -158,8 +162,17 @@ const listarMisProductos = async (req, res) => {
         p.fecha_creacion,
         p.fecha_actualizacion,
 
-        c.id AS categoria_id,
-        c.nombre AS categoria
+        c.nombre AS categoria,
+
+        (
+          SELECT i.url
+          FROM imagenes i
+          WHERE i.producto_id = p.id
+          ORDER BY
+            i.principal DESC,
+            i.id ASC
+          LIMIT 1
+        ) AS imagen_principal
 
       FROM productos p
 
@@ -176,8 +189,12 @@ const listarMisProductos = async (req, res) => {
     return res.json({
       productos: resultado.rows,
     });
+
   } catch (error) {
-    console.error('Error listando productos:', error);
+    console.error(
+      'Error listando productos:',
+      error
+    );
 
     return res.status(500).json({
       message: 'Error interno del servidor',
@@ -198,14 +215,25 @@ const listarProductosPorEmprendimiento = async (req, res) => {
       `
       SELECT
         p.id,
+        p.emprendimiento_id,
+        p.categoria_id,
         p.nombre,
         p.descripcion,
         p.precio,
         p.disponible,
         p.fecha_creacion,
 
-        c.id AS categoria_id,
-        c.nombre AS categoria
+        c.nombre AS categoria,
+
+        (
+          SELECT i.url
+          FROM imagenes i
+          WHERE i.producto_id = p.id
+          ORDER BY
+            i.principal DESC,
+            i.id ASC
+          LIMIT 1
+        ) AS imagen_principal
 
       FROM productos p
 
@@ -226,8 +254,12 @@ const listarProductosPorEmprendimiento = async (req, res) => {
     return res.json({
       productos: resultado.rows,
     });
+
   } catch (error) {
-    console.error('Error listando catálogo:', error);
+    console.error(
+      'Error listando catálogo:',
+      error
+    );
 
     return res.status(500).json({
       message: 'Error interno del servidor',
