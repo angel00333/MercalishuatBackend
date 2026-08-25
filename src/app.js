@@ -19,6 +19,11 @@ const imagenRoutes =
 const perfilImagenRoutes =
   require('./routes/perfil_imagen.routes');
 
+const publicacionRoutes =
+  require(
+    './routes/publicacion.routes'
+  );
+
 const app = express();
 
 
@@ -51,6 +56,11 @@ app.get('/', (req, res) => {
 app.use(
   '/api/perfil',
   perfilImagenRoutes
+);
+
+app.use(
+  '/api/publicaciones',
+  publicacionRoutes
 );
 
 app.use(
