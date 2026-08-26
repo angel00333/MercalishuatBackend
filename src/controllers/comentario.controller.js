@@ -1,17 +1,11 @@
 const pool = require('../config/db');
 
 
-const listarComentarios = async (
-  req,
-  res
-) => {
+const listarComentarios = async (req, res) => {
   try {
-    const {
-      id,
-    } = req.params;
+    const { id } = req.params;
 
-    const resultado =
-        await pool.query(
+    const resultado = await pool.query(
       `
       SELECT
         c.id,
@@ -39,14 +33,16 @@ const listarComentarios = async (
       ORDER BY c.fecha_creacion ASC
       `,
       [id]
-      
     );
-console.log('COMENTARIOS ENVIADOS:', resultado.rows); 
-    return res.json({
-      comentarios:
-        resultado.rows,
-    });
 
+    console.log(
+      'COMENTARIOS ENVIADOS:',
+      resultado.rows
+    );
+
+    return res.json({
+      comentarios: resultado.rows,
+    });
   } catch (error) {
     console.error(
       'Error listando comentarios:',
@@ -59,76 +55,6 @@ console.log('COMENTARIOS ENVIADOS:', resultado.rows);
     });
   }
 };
-
-
-const crearComentario = async (
-  req,
-  res
-) => {
-  try {
-    const usuarioId =
-        req.usuario.id;
-
-    const {
-      id,
-    } = req.params;
-
-    const {
-      texto,
-    } = req.body;
-
-    if (
-      !texto ||
-      texto.trim() === ''
-    ) {
-      return res.status(400).json({
-        message:
-          'Escribe un comentario',
-      });
-    }
-
-    const resultado =
-        await pool.query(
-      `
-      INSERT INTO comentarios
-      (
-        publicacion_id,
-        usuario_id,
-        texto
-      )
-
-      VALUES ($1, $2, $3)
-
-      RETURNING *
-      `,
-      [
-        id,
-        usuarioId,
-        texto.trim(),
-      ]
-    );
-
-    return res.status(201).json({
-      message:
-        'Comentario publicado',
-
-      comentario:
-        resultado.rows[0],
-    });
-
-  } catch (error) {
-    console.error(
-      'Error creando comentario:',
-      error
-    );
-
-    return res.status(500).json({
-      message:
-        'Error interno del servidor',
-    });
-  }
-};
-
 
 const eliminarComentario = async (
   req,
