@@ -39,8 +39,9 @@ const listarComentarios = async (
       ORDER BY c.fecha_creacion ASC
       `,
       [id]
+      
     );
-
+console.log('COMENTARIOS ENVIADOS:', resultado.rows); 
     return res.json({
       comentarios:
         resultado.rows,
