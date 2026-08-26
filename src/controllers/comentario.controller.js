@@ -21,21 +21,22 @@ const listarComentarios = async (
         c.comentario_padre_id,
         c.fecha_creacion,
 
-        u.nombre
-          AS usuario_nombre,
+        u.nombre AS usuario_nombre,
+        u.foto_perfil_url AS usuario_imagen,
 
-        u.foto_perfil_url
-          AS usuario_imagen
+        r.nombre AS usuario_rol
 
       FROM comentarios c
 
       INNER JOIN usuarios u
         ON u.id = c.usuario_id
 
+      INNER JOIN roles r
+        ON r.id = u.rol_id
+
       WHERE c.publicacion_id = $1
 
-      ORDER BY
-        c.fecha_creacion ASC
+      ORDER BY c.fecha_creacion ASC
       `,
       [id]
     );
