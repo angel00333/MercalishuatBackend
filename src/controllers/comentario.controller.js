@@ -18,6 +18,7 @@ const listarComentarios = async (
         c.publicacion_id,
         c.usuario_id,
         c.texto,
+        c.comentario_padre_id,
         c.fecha_creacion,
 
         u.nombre
@@ -182,9 +183,97 @@ const eliminarComentario = async (
   }
 };
 
+const responderComentario = async (req, res) => {
+  try {
+    const usuarioId = req.usuario.id;
+    const { comentarioId } = req.params;
+    const { texto } = req.body;
+
+    if (!texto || texto.trim() === '') {
+      return res.status(400).json({
+        message: 'Escribe una respuesta',
+      });
+    }
+
+    // Verificar que el comentario exista y que
+    // la publicación pertenezca al emprendedor.
+    const comentario = await pool.query(
+      `
+      SELECT
+        c.id,
+        c.publicacion_id,
+        p.emprendimiento_id
+      FROM comentarios c
+
+      INNER JOIN publicaciones p
+        ON p.id = c.publicacion_id
+
+      INNER JOIN emprendimientos e
+        ON e.id = p.emprendimiento_id
+
+      WHERE c.id = $1
+        AND e.usuario_id = $2
+      `,
+      [
+        comentarioId,
+        usuarioId,
+      ]
+    );
+
+    if (comentario.rows.length === 0) {
+      return res.status(403).json({
+        message:
+          'No puedes responder este comentario',
+      });
+    }
+
+    const publicacionId =
+        comentario.rows[0].publicacion_id;
+
+    const resultado = await pool.query(
+      `
+      INSERT INTO comentarios
+      (
+        publicacion_id,
+        usuario_id,
+        texto,
+        comentario_padre_id
+      )
+
+      VALUES ($1, $2, $3, $4)
+
+      RETURNING *
+      `,
+      [
+        publicacionId,
+        usuarioId,
+        texto.trim(),
+        comentarioId,
+      ]
+    );
+
+    return res.status(201).json({
+      message:
+        'Respuesta publicada correctamente',
+      comentario:
+        resultado.rows[0],
+    });
+  } catch (error) {
+    console.error(
+      'Error respondiendo comentario:',
+      error
+    );
+
+    return res.status(500).json({
+      message:
+        'Error interno del servidor',
+    });
+  }
+};
 
 module.exports = {
   listarComentarios,
   crearComentario,
   eliminarComentario,
+  responderComentario,
 };

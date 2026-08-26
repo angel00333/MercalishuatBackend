@@ -51,6 +51,7 @@ const {
   listarComentarios,
   crearComentario,
   eliminarComentario,
+  responderComentario,
 } = require(
   '../controllers/comentario.controller'
 );
@@ -163,6 +164,12 @@ router.delete(
   eliminarComentario
 );
 
+router.post(
+  '/comentarios/:comentarioId/responder',
+  verificarToken,
+  permitirRoles('emprendedor', 'usuario'),
+  responderComentario
+);
 
 // Imágenes
 
