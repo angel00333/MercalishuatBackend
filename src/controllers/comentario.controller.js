@@ -51,6 +51,11 @@ const listarComentarios = async (
       ]
     );
 
+    console.log(
+      'COMENTARIOS ENVIADOS:',
+      resultado.rows
+    );
+    
     return res.json({
       comentarios:
           resultado.rows,
