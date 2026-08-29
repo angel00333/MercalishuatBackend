@@ -6,9 +6,10 @@ const listarComentarios = async (
   res
 ) => {
   try {
-    const {
-      id,
-    } = req.params;
+    const { id } = req.params;
+
+    const usuarioId =
+        req.usuario.id;
 
     const resultado =
         await pool.query(
@@ -24,7 +25,13 @@ const listarComentarios = async (
         u.nombre AS usuario_nombre,
         u.foto_perfil_url AS usuario_imagen,
 
-        r.nombre AS usuario_rol
+        r.nombre AS usuario_rol,
+
+        CASE
+          WHEN c.usuario_id = $2
+          THEN TRUE
+          ELSE FALSE
+        END AS puede_eliminar
 
       FROM comentarios c
 
@@ -38,17 +45,16 @@ const listarComentarios = async (
 
       ORDER BY c.fecha_creacion ASC
       `,
-      [id]
-      
+      [
+        id,
+        usuarioId,
+      ]
     );
-
-console.log('COMENTARIOS ENVIADOS:', resultado.rows); 
 
     return res.json({
       comentarios:
-        resultado.rows,
+          resultado.rows,
     });
-
   } catch (error) {
     console.error(
       'Error listando comentarios:',
@@ -57,11 +63,10 @@ console.log('COMENTARIOS ENVIADOS:', resultado.rows);
 
     return res.status(500).json({
       message:
-        'Error interno del servidor',
+          'Error interno del servidor',
     });
   }
 };
-
 
 const crearComentario = async (
   req,
