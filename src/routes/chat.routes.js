@@ -1,13 +1,17 @@
-const express =
-  require('express');
+const express = require('express');
 
-const router =
-  express.Router();
+const router = express.Router();
 
 const chatController =
   require(
     '../controllers/chat.controller'
   );
+
+const {
+  verificarToken,
+} = require(
+  '../middlewares/auth.middleware'
+);
 
 // ============================================================
 // CREAR O BUSCAR CONVERSACIÓN
@@ -15,6 +19,7 @@ const chatController =
 
 router.post(
   '/conversacion',
+  verificarToken,
   chatController.crearConversacion
 );
 
@@ -24,6 +29,7 @@ router.post(
 
 router.get(
   '/conversaciones',
+  verificarToken,
   chatController.listarConversaciones
 );
 
@@ -33,6 +39,7 @@ router.get(
 
 router.get(
   '/conversacion/:id/mensajes',
+  verificarToken,
   chatController.obtenerMensajes
 );
 
@@ -42,6 +49,7 @@ router.get(
 
 router.post(
   '/conversacion/:id/mensaje',
+  verificarToken,
   chatController.enviarMensaje
 );
 
@@ -51,12 +59,12 @@ router.post(
 
 router.put(
   '/conversacion/:id/leidos',
+  verificarToken,
   chatController.marcarComoLeidos
 );
 
 // ============================================================
-// EXPORTAR ROUTER
+// EXPORTAR
 // ============================================================
 
-module.exports =
-  router;
+module.exports = router;

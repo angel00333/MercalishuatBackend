@@ -7,9 +7,10 @@ const pool = require('../config/db');
 function obtenerUsuarioId(req) {
   return (
     req.usuario?.id ||
-    req.user?.id ||
     req.usuario?.id_usuario ||
-    req.user?.id_usuario
+    req.user?.id ||
+    req.user?.id_usuario ||
+    null
   );
 }
 
@@ -24,11 +25,16 @@ function obtenerUsuarioId(req) {
 // }
 // ============================================================
 
-exports.crearConversacion = async (req, res) => {
-  const client = await pool.connect();
+exports.crearConversacion = async (
+  req,
+  res
+) => {
+  const client =
+    await pool.connect();
 
   try {
-    const usuarioId = obtenerUsuarioId(req);
+    const usuarioId =
+      obtenerUsuarioId(req);
 
     const {
       usuario_destino_id,
@@ -37,20 +43,35 @@ exports.crearConversacion = async (req, res) => {
     if (!usuarioId) {
       return res.status(401).json({
         success: false,
-        message: 'Usuario no autenticado',
+        message:
+          'Usuario no autenticado',
       });
     }
 
     if (!usuario_destino_id) {
       return res.status(400).json({
         success: false,
-        message: 'Falta usuario_destino_id',
+        message:
+          'Falta usuario_destino_id',
       });
     }
 
-    const destinoId = Number(
-      usuario_destino_id,
-    );
+    const destinoId =
+      Number(
+        usuario_destino_id,
+      );
+
+    if (
+      !Number.isInteger(
+        destinoId,
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'ID de usuario destinatario inválido',
+      });
+    }
 
     if (
       Number(usuarioId) ===
@@ -70,10 +91,11 @@ exports.crearConversacion = async (req, res) => {
     const usuarioExiste =
       await client.query(
         `
-        SELECT id
-        FROM usuarios
-        WHERE id = $1
-        LIMIT 1
+          SELECT
+            id_usuario
+          FROM usuarios
+          WHERE id_usuario = $1
+          LIMIT 1
         `,
         [
           destinoId,
@@ -81,7 +103,8 @@ exports.crearConversacion = async (req, res) => {
       );
 
     if (
-      usuarioExiste.rowCount === 0
+      usuarioExiste.rowCount ===
+      0
     ) {
       return res.status(404).json({
         success: false,
@@ -91,33 +114,32 @@ exports.crearConversacion = async (req, res) => {
     }
 
     // ========================================================
-    // BUSCAR UNA CONVERSACIÓN EXISTENTE ENTRE AMBOS
-    //
-    // Solo consideramos conversaciones que tengan exactamente
-    // estos dos participantes.
+    // BUSCAR CONVERSACIÓN EXISTENTE
     // ========================================================
 
     const conversacionExistente =
       await client.query(
         `
-        SELECT c.id
-        FROM conversaciones c
+          SELECT
+            c.id
+          FROM conversaciones c
 
-        JOIN participantes_conversacion p1
-          ON p1.conversacion_id = c.id
-          AND p1.usuario_id = $1
+          JOIN participantes_conversacion p1
+            ON p1.conversacion_id = c.id
+            AND p1.usuario_id = $1
 
-        JOIN participantes_conversacion p2
-          ON p2.conversacion_id = c.id
-          AND p2.usuario_id = $2
+          JOIN participantes_conversacion p2
+            ON p2.conversacion_id = c.id
+            AND p2.usuario_id = $2
 
-        WHERE (
-          SELECT COUNT(*)
-          FROM participantes_conversacion pc
-          WHERE pc.conversacion_id = c.id
-        ) = 2
+          WHERE (
+            SELECT COUNT(*)
+            FROM participantes_conversacion pc
+            WHERE
+              pc.conversacion_id = c.id
+          ) = 2
 
-        LIMIT 1
+          LIMIT 1
         `,
         [
           usuarioId,
@@ -126,7 +148,8 @@ exports.crearConversacion = async (req, res) => {
       );
 
     if (
-      conversacionExistente.rowCount >
+      conversacionExistente
+          .rowCount >
       0
     ) {
       return res.status(200).json({
@@ -134,7 +157,8 @@ exports.crearConversacion = async (req, res) => {
         creada: false,
         conversacion_id:
           conversacionExistente
-            .rows[0].id,
+            .rows[0]
+            .id,
       });
     }
 
@@ -149,20 +173,22 @@ exports.crearConversacion = async (req, res) => {
     const nuevaConversacion =
       await client.query(
         `
-        INSERT INTO conversaciones (
-          created_at,
-          updated_at
-        )
-        VALUES (
-          NOW(),
-          NOW()
-        )
-        RETURNING id
+          INSERT INTO conversaciones (
+            created_at,
+            updated_at
+          )
+          VALUES (
+            NOW(),
+            NOW()
+          )
+          RETURNING id
         `,
       );
 
     const conversacionId =
-      nuevaConversacion.rows[0].id;
+      nuevaConversacion
+        .rows[0]
+        .id;
 
     // ========================================================
     // AGREGAR PARTICIPANTES
@@ -170,13 +196,13 @@ exports.crearConversacion = async (req, res) => {
 
     await client.query(
       `
-      INSERT INTO participantes_conversacion (
-        conversacion_id,
-        usuario_id
-      )
-      VALUES
-        ($1, $2),
-        ($1, $3)
+        INSERT INTO participantes_conversacion (
+          conversacion_id,
+          usuario_id
+        )
+        VALUES
+          ($1, $2),
+          ($1, $3)
       `,
       [
         conversacionId,
@@ -224,7 +250,10 @@ exports.crearConversacion = async (req, res) => {
 // ============================================================
 
 exports.listarConversaciones =
-  async (req, res) => {
+  async (
+    req,
+    res
+  ) => {
     try {
       const usuarioId =
         obtenerUsuarioId(req);
@@ -240,73 +269,93 @@ exports.listarConversaciones =
       const resultado =
         await pool.query(
           `
-          SELECT
-            c.id,
+            SELECT
+              c.id,
+              c.created_at,
+              c.updated_at,
 
-            c.created_at,
-            c.updated_at,
+              otro.usuario_id
+                AS otro_usuario_id,
 
-            otro.usuario_id
-              AS otro_usuario_id,
+              u.nombre,
 
-            u.nombre,
-            u.apellido,
+              '' AS apellido,
 
-            (
-              SELECT m.contenido
-              FROM mensajes m
-              WHERE
-                m.conversacion_id = c.id
-              ORDER BY
-                m.created_at DESC,
-                m.id DESC
-              LIMIT 1
-            ) AS ultimo_mensaje,
-
-            (
-              SELECT m.created_at
-              FROM mensajes m
-              WHERE
-                m.conversacion_id = c.id
-              ORDER BY
-                m.created_at DESC,
-                m.id DESC
-              LIMIT 1
-            ) AS ultimo_mensaje_fecha,
-
-            (
-              SELECT COUNT(*)
-              FROM mensajes m
-              WHERE
-                m.conversacion_id = c.id
-                AND m.remitente_id <> $1
-                AND m.leido = FALSE
-            )::INTEGER
-              AS mensajes_no_leidos
-
-          FROM conversaciones c
-
-          JOIN participantes_conversacion yo
-            ON yo.conversacion_id = c.id
-            AND yo.usuario_id = $1
-
-          JOIN participantes_conversacion otro
-            ON otro.conversacion_id = c.id
-            AND otro.usuario_id <> $1
-
-          JOIN usuarios u
-            ON u.id = otro.usuario_id
-
-          ORDER BY
-            COALESCE(
               (
-                SELECT MAX(m.created_at)
+                SELECT
+                  m.contenido
                 FROM mensajes m
                 WHERE
-                  m.conversacion_id = c.id
-              ),
-              c.updated_at
-            ) DESC
+                  m.conversacion_id =
+                    c.id
+                ORDER BY
+                  m.created_at DESC,
+                  m.id DESC
+                LIMIT 1
+              )
+                AS ultimo_mensaje,
+
+              (
+                SELECT
+                  m.created_at
+                FROM mensajes m
+                WHERE
+                  m.conversacion_id =
+                    c.id
+                ORDER BY
+                  m.created_at DESC,
+                  m.id DESC
+                LIMIT 1
+              )
+                AS ultimo_mensaje_fecha,
+
+              (
+                SELECT COUNT(*)
+                FROM mensajes m
+                WHERE
+                  m.conversacion_id =
+                    c.id
+                  AND
+                    m.remitente_id <>
+                    $1
+                  AND
+                    m.leido =
+                    FALSE
+              )::INTEGER
+                AS mensajes_no_leidos
+
+            FROM conversaciones c
+
+            JOIN participantes_conversacion yo
+              ON yo.conversacion_id =
+                 c.id
+              AND yo.usuario_id =
+                  $1
+
+            JOIN participantes_conversacion otro
+              ON otro.conversacion_id =
+                 c.id
+              AND otro.usuario_id <>
+                  $1
+
+            JOIN usuarios u
+              ON u.id_usuario =
+                 otro.usuario_id
+
+            ORDER BY
+              COALESCE(
+                (
+                  SELECT
+                    MAX(
+                      m.created_at
+                    )
+                  FROM mensajes m
+                  WHERE
+                    m.conversacion_id =
+                      c.id
+                ),
+                c.updated_at
+              ) DESC
           `,
           [
             usuarioId,
@@ -339,13 +388,18 @@ exports.listarConversaciones =
 // ============================================================
 
 exports.obtenerMensajes =
-  async (req, res) => {
+  async (
+    req,
+    res
+  ) => {
     try {
       const usuarioId =
         obtenerUsuarioId(req);
 
       const conversacionId =
-        Number(req.params.id);
+        Number(
+          req.params.id,
+        );
 
       if (!usuarioId) {
         return res.status(401).json({
@@ -368,18 +422,21 @@ exports.obtenerMensajes =
       }
 
       // ======================================================
-      // VERIFICAR QUE EL USUARIO PERTENEZCA A LA CONVERSACIÓN
+      // VERIFICAR QUE PERTENEZCA A LA CONVERSACIÓN
       // ======================================================
 
       const pertenece =
         await pool.query(
           `
-          SELECT id
-          FROM participantes_conversacion
-          WHERE
-            conversacion_id = $1
-            AND usuario_id = $2
-          LIMIT 1
+            SELECT
+              id
+            FROM participantes_conversacion
+            WHERE
+              conversacion_id =
+                $1
+              AND usuario_id =
+                $2
+            LIMIT 1
           `,
           [
             conversacionId,
@@ -388,7 +445,8 @@ exports.obtenerMensajes =
         );
 
       if (
-        pertenece.rowCount === 0
+        pertenece.rowCount ===
+        0
       ) {
         return res.status(403).json({
           success: false,
@@ -404,28 +462,32 @@ exports.obtenerMensajes =
       const resultado =
         await pool.query(
           `
-          SELECT
-            m.id,
-            m.conversacion_id,
-            m.remitente_id,
-            m.contenido,
-            m.leido,
-            m.created_at,
+            SELECT
+              m.id,
+              m.conversacion_id,
+              m.remitente_id,
+              m.contenido,
+              m.leido,
+              m.created_at,
 
-            CASE
-              WHEN m.remitente_id = $2
-              THEN TRUE
-              ELSE FALSE
-            END AS es_mio
+              CASE
+                WHEN
+                  m.remitente_id =
+                  $2
+                THEN TRUE
+                ELSE FALSE
+              END
+                AS es_mio
 
-          FROM mensajes m
+            FROM mensajes m
 
-          WHERE
-            m.conversacion_id = $1
+            WHERE
+              m.conversacion_id =
+                $1
 
-          ORDER BY
-            m.created_at ASC,
-            m.id ASC
+            ORDER BY
+              m.created_at ASC,
+              m.id ASC
           `,
           [
             conversacionId,
@@ -463,7 +525,10 @@ exports.obtenerMensajes =
 // ============================================================
 
 exports.enviarMensaje =
-  async (req, res) => {
+  async (
+    req,
+    res
+  ) => {
     const client =
       await pool.connect();
 
@@ -472,7 +537,9 @@ exports.enviarMensaje =
         obtenerUsuarioId(req);
 
       const conversacionId =
-        Number(req.params.id);
+        Number(
+          req.params.id,
+        );
 
       const contenido =
         req.body.contenido
@@ -507,7 +574,10 @@ exports.enviarMensaje =
         });
       }
 
-      if (contenido.length > 5000) {
+      if (
+        contenido.length >
+        5000
+      ) {
         return res.status(400).json({
           success: false,
           message:
@@ -522,12 +592,15 @@ exports.enviarMensaje =
       const pertenece =
         await client.query(
           `
-          SELECT id
-          FROM participantes_conversacion
-          WHERE
-            conversacion_id = $1
-            AND usuario_id = $2
-          LIMIT 1
+            SELECT
+              id
+            FROM participantes_conversacion
+            WHERE
+              conversacion_id =
+                $1
+              AND usuario_id =
+                $2
+            LIMIT 1
           `,
           [
             conversacionId,
@@ -536,7 +609,8 @@ exports.enviarMensaje =
         );
 
       if (
-        pertenece.rowCount === 0
+        pertenece.rowCount ===
+        0
       ) {
         return res.status(403).json({
           success: false,
@@ -556,28 +630,28 @@ exports.enviarMensaje =
       const resultado =
         await client.query(
           `
-          INSERT INTO mensajes (
-            conversacion_id,
-            remitente_id,
-            contenido,
-            leido,
-            created_at
-          )
-          VALUES (
-            $1,
-            $2,
-            $3,
-            FALSE,
-            NOW()
-          )
+            INSERT INTO mensajes (
+              conversacion_id,
+              remitente_id,
+              contenido,
+              leido,
+              created_at
+            )
+            VALUES (
+              $1,
+              $2,
+              $3,
+              FALSE,
+              NOW()
+            )
 
-          RETURNING
-            id,
-            conversacion_id,
-            remitente_id,
-            contenido,
-            leido,
-            created_at
+            RETURNING
+              id,
+              conversacion_id,
+              remitente_id,
+              contenido,
+              leido,
+              created_at
           `,
           [
             conversacionId,
@@ -592,9 +666,11 @@ exports.enviarMensaje =
 
       await client.query(
         `
-        UPDATE conversaciones
-        SET updated_at = NOW()
-        WHERE id = $1
+          UPDATE conversaciones
+          SET updated_at =
+            NOW()
+          WHERE id =
+            $1
         `,
         [
           conversacionId,
@@ -605,10 +681,15 @@ exports.enviarMensaje =
         'COMMIT',
       );
 
+      const mensaje =
+        resultado.rows[0];
+
+      mensaje.es_mio =
+        true;
+
       return res.status(201).json({
         success: true,
-        mensaje:
-          resultado.rows[0],
+        mensaje,
       });
     } catch (error) {
       try {
@@ -639,13 +720,18 @@ exports.enviarMensaje =
 // ============================================================
 
 exports.marcarComoLeidos =
-  async (req, res) => {
+  async (
+    req,
+    res
+  ) => {
     try {
       const usuarioId =
         obtenerUsuarioId(req);
 
       const conversacionId =
-        Number(req.params.id);
+        Number(
+          req.params.id,
+        );
 
       if (!usuarioId) {
         return res.status(401).json({
@@ -667,15 +753,22 @@ exports.marcarComoLeidos =
         });
       }
 
+      // ======================================================
+      // VERIFICAR PARTICIPANTE
+      // ======================================================
+
       const pertenece =
         await pool.query(
           `
-          SELECT id
-          FROM participantes_conversacion
-          WHERE
-            conversacion_id = $1
-            AND usuario_id = $2
-          LIMIT 1
+            SELECT
+              id
+            FROM participantes_conversacion
+            WHERE
+              conversacion_id =
+                $1
+              AND usuario_id =
+                $2
+            LIMIT 1
           `,
           [
             conversacionId,
@@ -684,7 +777,8 @@ exports.marcarComoLeidos =
         );
 
       if (
-        pertenece.rowCount === 0
+        pertenece.rowCount ===
+        0
       ) {
         return res.status(403).json({
           success: false,
@@ -693,19 +787,32 @@ exports.marcarComoLeidos =
         });
       }
 
+      // ======================================================
+      // MARCAR LEÍDOS
+      // ======================================================
+
       const resultado =
         await pool.query(
           `
-          UPDATE mensajes
+            UPDATE mensajes
 
-          SET leido = TRUE
+            SET leido =
+              TRUE
 
-          WHERE
-            conversacion_id = $1
-            AND remitente_id <> $2
-            AND leido = FALSE
+            WHERE
+              conversacion_id =
+                $1
 
-          RETURNING id
+              AND
+                remitente_id <>
+                $2
+
+              AND
+                leido =
+                FALSE
+
+            RETURNING
+              id
           `,
           [
             conversacionId,
