@@ -10,7 +10,7 @@ const chatController =
 const {
   verificarToken,
 } = require(
-  '../middlewares/auth.middleware'
+  '../middleware/auth.middleware'
 );
 
 // ============================================================
