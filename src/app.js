@@ -24,7 +24,12 @@ const publicacionRoutes =
     './routes/publicacion.routes'
   );
 
+const chatRoutes =
+  require('./routes/chat.routes');
+
 const app = express();
+
+
 
 
 // =======================================
@@ -86,6 +91,11 @@ app.use(
 app.use(
   '/api/imagenes',
   imagenRoutes
+);
+
+app.use(
+  '/api/chat',
+  chatRoutes,
 );
 
 // =======================================
