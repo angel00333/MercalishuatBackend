@@ -40,6 +40,10 @@ exports.crearConversacion = async (
       usuario_destino_id,
     } = req.body;
 
+    // ========================================================
+    // VALIDAR USUARIO AUTENTICADO
+    // ========================================================
+
     if (!usuarioId) {
       return res.status(401).json({
         success: false,
@@ -47,6 +51,10 @@ exports.crearConversacion = async (
           'Usuario no autenticado',
       });
     }
+
+    // ========================================================
+    // VALIDAR DESTINATARIO
+    // ========================================================
 
     if (!usuario_destino_id) {
       return res.status(400).json({
@@ -73,6 +81,10 @@ exports.crearConversacion = async (
       });
     }
 
+    // ========================================================
+    // EVITAR CHAT CONSIGO MISMO
+    // ========================================================
+
     if (
       Number(usuarioId) ===
       destinoId
@@ -92,9 +104,9 @@ exports.crearConversacion = async (
       await client.query(
         `
           SELECT
-            id_usuario
+            id
           FROM usuarios
-          WHERE id_usuario = $1
+          WHERE id = $1
           LIMIT 1
         `,
         [
@@ -114,7 +126,7 @@ exports.crearConversacion = async (
     }
 
     // ========================================================
-    // BUSCAR CONVERSACIÓN EXISTENTE
+    // BUSCAR SI YA EXISTE UNA CONVERSACIÓN ENTRE LOS DOS
     // ========================================================
 
     const conversacionExistente =
@@ -147,6 +159,10 @@ exports.crearConversacion = async (
         ],
       );
 
+    // ========================================================
+    // SI YA EXISTE, DEVOLVERLA
+    // ========================================================
+
     if (
       conversacionExistente
           .rowCount >
@@ -163,7 +179,7 @@ exports.crearConversacion = async (
     }
 
     // ========================================================
-    // CREAR CONVERSACIÓN
+    // CREAR NUEVA CONVERSACIÓN
     // ========================================================
 
     await client.query(
@@ -237,6 +253,8 @@ exports.crearConversacion = async (
       success: false,
       message:
         'No se pudo crear la conversación',
+      error:
+        error.message,
     });
   } finally {
     client.release();
@@ -280,6 +298,8 @@ exports.listarConversaciones =
               u.nombre,
 
               '' AS apellido,
+
+              u.correo,
 
               (
                 SELECT
@@ -339,7 +359,7 @@ exports.listarConversaciones =
                   $1
 
             JOIN usuarios u
-              ON u.id_usuario =
+              ON u.id =
                  otro.usuario_id
 
             ORDER BY
@@ -377,6 +397,8 @@ exports.listarConversaciones =
         success: false,
         message:
           'No se pudieron cargar las conversaciones',
+        error:
+          error.message,
       });
     }
   };
@@ -401,6 +423,10 @@ exports.obtenerMensajes =
           req.params.id,
         );
 
+      // ======================================================
+      // VALIDAR USUARIO
+      // ======================================================
+
       if (!usuarioId) {
         return res.status(401).json({
           success: false,
@@ -408,6 +434,10 @@ exports.obtenerMensajes =
             'Usuario no autenticado',
         });
       }
+
+      // ======================================================
+      // VALIDAR CONVERSACIÓN
+      // ======================================================
 
       if (
         !Number.isInteger(
@@ -422,7 +452,7 @@ exports.obtenerMensajes =
       }
 
       // ======================================================
-      // VERIFICAR QUE PERTENEZCA A LA CONVERSACIÓN
+      // VERIFICAR PARTICIPANTE
       // ======================================================
 
       const pertenece =
@@ -456,7 +486,7 @@ exports.obtenerMensajes =
       }
 
       // ======================================================
-      // MENSAJES
+      // OBTENER MENSAJES
       // ======================================================
 
       const resultado =
@@ -510,6 +540,8 @@ exports.obtenerMensajes =
         success: false,
         message:
           'No se pudieron cargar los mensajes',
+        error:
+          error.message,
       });
     }
   };
@@ -519,6 +551,7 @@ exports.obtenerMensajes =
 //
 // POST /api/chat/conversacion/:id/mensaje
 //
+// body:
 // {
 //   "contenido": "Hola"
 // }
@@ -546,6 +579,10 @@ exports.enviarMensaje =
           ?.toString()
           .trim();
 
+      // ======================================================
+      // VALIDAR USUARIO
+      // ======================================================
+
       if (!usuarioId) {
         return res.status(401).json({
           success: false,
@@ -553,6 +590,10 @@ exports.enviarMensaje =
             'Usuario no autenticado',
         });
       }
+
+      // ======================================================
+      // VALIDAR CONVERSACIÓN
+      // ======================================================
 
       if (
         !Number.isInteger(
@@ -565,6 +606,10 @@ exports.enviarMensaje =
             'Conversación inválida',
         });
       }
+
+      // ======================================================
+      // VALIDAR CONTENIDO
+      // ======================================================
 
       if (!contenido) {
         return res.status(400).json({
@@ -619,6 +664,10 @@ exports.enviarMensaje =
         });
       }
 
+      // ======================================================
+      // INICIAR TRANSACCIÓN
+      // ======================================================
+
       await client.query(
         'BEGIN',
       );
@@ -661,7 +710,7 @@ exports.enviarMensaje =
         );
 
       // ======================================================
-      // ACTUALIZAR CONVERSACIÓN
+      // ACTUALIZAR FECHA DE CONVERSACIÓN
       // ======================================================
 
       await client.query(
@@ -707,6 +756,8 @@ exports.enviarMensaje =
         success: false,
         message:
           'No se pudo enviar el mensaje',
+        error:
+          error.message,
       });
     } finally {
       client.release();
@@ -733,6 +784,10 @@ exports.marcarComoLeidos =
           req.params.id,
         );
 
+      // ======================================================
+      // VALIDAR USUARIO
+      // ======================================================
+
       if (!usuarioId) {
         return res.status(401).json({
           success: false,
@@ -740,6 +795,10 @@ exports.marcarComoLeidos =
             'Usuario no autenticado',
         });
       }
+
+      // ======================================================
+      // VALIDAR CONVERSACIÓN
+      // ======================================================
 
       if (
         !Number.isInteger(
@@ -788,7 +847,7 @@ exports.marcarComoLeidos =
       }
 
       // ======================================================
-      // MARCAR LEÍDOS
+      // MARCAR COMO LEÍDOS LOS MENSAJES DEL OTRO USUARIO
       // ======================================================
 
       const resultado =
@@ -835,6 +894,8 @@ exports.marcarComoLeidos =
         success: false,
         message:
           'No se pudieron actualizar los mensajes',
+        error:
+          error.message,
       });
     }
   };
