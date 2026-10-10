@@ -641,10 +641,8 @@ exports.enviarMensaje =
               id
             FROM participantes_conversacion
             WHERE
-              conversacion_id =
-                $1
-              AND usuario_id =
-                $2
+              conversacion_id = $1
+              AND usuario_id = $2
             LIMIT 1
           `,
           [
@@ -663,6 +661,45 @@ exports.enviarMensaje =
             'No tienes acceso a esta conversación',
         });
       }
+
+      // ======================================================
+      // OBTENER DESTINATARIO
+      // ======================================================
+
+      const destinatarioResultado =
+        await client.query(
+          `
+            SELECT
+              usuario_id
+            FROM participantes_conversacion
+            WHERE
+              conversacion_id = $1
+              AND usuario_id <> $2
+            LIMIT 1
+          `,
+          [
+            conversacionId,
+            usuarioId,
+          ],
+        );
+
+      if (
+        destinatarioResultado.rowCount ===
+        0
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            'No se encontró el destinatario',
+        });
+      }
+
+      const destinatarioId =
+        Number(
+          destinatarioResultado
+            .rows[0]
+            .usuario_id,
+        );
 
       // ======================================================
       // INICIAR TRANSACCIÓN
@@ -710,16 +747,14 @@ exports.enviarMensaje =
         );
 
       // ======================================================
-      // ACTUALIZAR FECHA DE CONVERSACIÓN
+      // ACTUALIZAR CONVERSACIÓN
       // ======================================================
 
       await client.query(
         `
           UPDATE conversaciones
-          SET updated_at =
-            NOW()
-          WHERE id =
-            $1
+          SET updated_at = NOW()
+          WHERE id = $1
         `,
         [
           conversacionId,
@@ -730,11 +765,72 @@ exports.enviarMensaje =
         'COMMIT',
       );
 
+      // ======================================================
+      // MENSAJE GUARDADO
+      // ======================================================
+
       const mensaje =
         resultado.rows[0];
 
       mensaje.es_mio =
         true;
+
+      // ======================================================
+      // SOCKET.IO
+      // ======================================================
+
+      const io =
+        req.app.get(
+          'io',
+        );
+
+      if (io) {
+        // ====================================================
+        // MENSAJE PARA EL DESTINATARIO
+        // ====================================================
+
+        io.to(
+          `usuario:${destinatarioId}`
+        ).emit(
+          'nuevo_mensaje',
+          {
+            id:
+              mensaje.id,
+
+            conversacion_id:
+              mensaje.conversacion_id,
+
+            remitente_id:
+              mensaje.remitente_id,
+
+            contenido:
+              mensaje.contenido,
+
+            leido:
+              mensaje.leido,
+
+            created_at:
+              mensaje.created_at,
+
+            es_mio:
+              false,
+          }
+        );
+
+        // ====================================================
+        // ACTUALIZAR LISTA DE CONVERSACIONES
+        // ====================================================
+
+        io.to(
+          `usuario:${destinatarioId}`
+        ).emit(
+          'conversacion_actualizada',
+          {
+            conversacion_id:
+              conversacionId,
+          }
+        );
+      }
 
       return res.status(201).json({
         success: true,
@@ -763,7 +859,6 @@ exports.enviarMensaje =
       client.release();
     }
   };
-
 // ============================================================
 // MARCAR MENSAJES COMO LEÍDOS
 //
