@@ -1,11 +1,20 @@
-const pool = require('../config/db');
+const pool =
+  require('../config/db');
+
+const {
+  crearNotificacion,
+} = require(
+  '../services/notificacion.service'
+);
 
 
 // ============================================================
 // UTILIDAD
 // ============================================================
 
-function obtenerUsuarioId(req) {
+function obtenerUsuarioId(
+  req
+) {
   return (
     req.usuario?.id ||
     req.user?.id ||
@@ -25,115 +34,143 @@ function obtenerUsuarioId(req) {
 // }
 // ============================================================
 
-exports.crearConversacion = async (
-  req,
-  res
-) => {
-  const client =
-    await pool.connect();
+exports.crearConversacion =
+  async (
+    req,
+    res
+  ) => {
+    const client =
+      await pool.connect();
 
-  try {
-    const usuarioId =
-      obtenerUsuarioId(req);
+    try {
+      const usuarioId =
+        obtenerUsuarioId(
+          req
+        );
 
-    const {
-      usuario_destino_id,
-    } = req.body;
+      const {
+        usuario_destino_id,
+      } = req.body;
 
-    // ========================================================
-    // VALIDAR USUARIO
-    // ========================================================
+      // ======================================================
+      // VALIDAR USUARIO
+      // ======================================================
 
-    if (!usuarioId) {
-      return res.status(401).json({
-        success: false,
-        message:
-          'Usuario no autenticado',
-      });
-    }
+      if (!usuarioId) {
+        return res
+          .status(401)
+          .json({
+            success:
+              false,
 
-    // ========================================================
-    // VALIDAR DESTINATARIO
-    // ========================================================
+            message:
+              'Usuario no autenticado',
+          });
+      }
 
-    if (!usuario_destino_id) {
-      return res.status(400).json({
-        success: false,
-        message:
-          'Falta usuario_destino_id',
-      });
-    }
+      // ======================================================
+      // VALIDAR DESTINATARIO
+      // ======================================================
 
-    const destinoId =
-      Number(
-        usuario_destino_id
-      );
+      if (!usuario_destino_id) {
+        return res
+          .status(400)
+          .json({
+            success:
+              false,
 
-    if (
-      !Number.isInteger(
-        destinoId
-      )
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          'ID de usuario destinatario inválido',
-      });
-    }
+            message:
+              'Falta usuario_destino_id',
+          });
+      }
 
-    // ========================================================
-    // EVITAR CHAT CONSIGO MISMO
-    // ========================================================
+      const destinoId =
+        Number(
+          usuario_destino_id
+        );
 
-    if (
-      Number(usuarioId) ===
-      destinoId
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          'No puedes iniciar una conversación contigo mismo',
-      });
-    }
+      if (
+        !Number.isInteger(
+          destinoId
+        )
+      ) {
+        return res
+          .status(400)
+          .json({
+            success:
+              false,
 
-    // ========================================================
-    // VERIFICAR DESTINATARIO
-    // ========================================================
+            message:
+              'ID de usuario destinatario inválido',
+          });
+      }
 
-    const usuarioExiste =
-      await client.query(
-        `
+      // ======================================================
+      // EVITAR CHAT CONSIGO MISMO
+      // ======================================================
+
+      if (
+        Number(
+          usuarioId
+        ) === destinoId
+      ) {
+        return res
+          .status(400)
+          .json({
+            success:
+              false,
+
+            message:
+              'No puedes iniciar una conversación contigo mismo',
+          });
+      }
+
+      // ======================================================
+      // VERIFICAR DESTINATARIO
+      // ======================================================
+
+      const usuarioExiste =
+        await client.query(
+          `
           SELECT
             id
+
           FROM usuarios
+
           WHERE id = $1
+
           LIMIT 1
-        `,
-        [
-          destinoId,
-        ]
-      );
+          `,
+          [
+            destinoId,
+          ]
+        );
 
-    if (
-      usuarioExiste.rowCount ===
-      0
-    ) {
-      return res.status(404).json({
-        success: false,
-        message:
-          'El usuario destinatario no existe',
-      });
-    }
+      if (
+        usuarioExiste.rowCount ===
+        0
+      ) {
+        return res
+          .status(404)
+          .json({
+            success:
+              false,
 
-    // ========================================================
-    // BUSCAR CONVERSACIÓN EXISTENTE
-    // ========================================================
+            message:
+              'El usuario destinatario no existe',
+          });
+      }
 
-    const conversacionExistente =
-      await client.query(
-        `
+      // ======================================================
+      // BUSCAR CONVERSACIÓN EXISTENTE
+      // ======================================================
+
+      const conversacionExistente =
+        await client.query(
+          `
           SELECT
             c.id
+
           FROM conversaciones c
 
           JOIN participantes_conversacion p1
@@ -146,117 +183,142 @@ exports.crearConversacion = async (
 
           WHERE (
             SELECT COUNT(*)
+
             FROM participantes_conversacion pc
+
             WHERE
               pc.conversacion_id = c.id
           ) = 2
 
           LIMIT 1
+          `,
+          [
+            usuarioId,
+            destinoId,
+          ]
+        );
+
+      if (
+        conversacionExistente
+          .rowCount >
+        0
+      ) {
+        return res
+          .status(200)
+          .json({
+            success:
+              true,
+
+            creada:
+              false,
+
+            conversacion_id:
+              conversacionExistente
+                .rows[0]
+                .id,
+          });
+      }
+
+      // ======================================================
+      // CREAR CONVERSACIÓN
+      // ======================================================
+
+      await client.query(
+        'BEGIN'
+      );
+
+      const nuevaConversacion =
+        await client.query(
+          `
+          INSERT INTO conversaciones (
+            created_at,
+            updated_at
+          )
+
+          VALUES (
+            NOW(),
+            NOW()
+          )
+
+          RETURNING id
+          `
+        );
+
+      const conversacionId =
+        nuevaConversacion
+          .rows[0]
+          .id;
+
+      // ======================================================
+      // AGREGAR PARTICIPANTES
+      // ======================================================
+
+      await client.query(
+        `
+        INSERT INTO participantes_conversacion (
+          conversacion_id,
+          usuario_id
+        )
+
+        VALUES
+          ($1, $2),
+          ($1, $3)
         `,
         [
+          conversacionId,
           usuarioId,
           destinoId,
         ]
       );
 
-    if (
-      conversacionExistente
-        .rowCount > 0
-    ) {
-      return res.status(200).json({
-        success: true,
-        creada: false,
-        conversacion_id:
-          conversacionExistente
-            .rows[0]
-            .id,
-      });
-    }
-
-    // ========================================================
-    // CREAR CONVERSACIÓN
-    // ========================================================
-
-    await client.query(
-      'BEGIN'
-    );
-
-    const nuevaConversacion =
       await client.query(
-        `
-          INSERT INTO conversaciones (
-            created_at,
-            updated_at
-          )
-          VALUES (
-            NOW(),
-            NOW()
-          )
-          RETURNING id
-        `
+        'COMMIT'
       );
 
-    const conversacionId =
-      nuevaConversacion
-        .rows[0]
-        .id;
+      return res
+        .status(201)
+        .json({
+          success:
+            true,
 
-    // ========================================================
-    // AGREGAR PARTICIPANTES
-    // ========================================================
+          creada:
+            true,
 
-    await client.query(
-      `
-        INSERT INTO participantes_conversacion (
-          conversacion_id,
-          usuario_id
-        )
-        VALUES
-          ($1, $2),
-          ($1, $3)
-      `,
-      [
-        conversacionId,
-        usuarioId,
-        destinoId,
-      ]
-    );
+          conversacion_id:
+            conversacionId,
+        });
 
-    await client.query(
-      'COMMIT'
-    );
-
-    return res.status(201).json({
-      success: true,
-      creada: true,
-      conversacion_id:
-        conversacionId,
-    });
-
-  } catch (error) {
-    try {
-      await client.query(
-        'ROLLBACK'
-      );
-    } catch (_) {}
-
-    console.error(
-      'ERROR CREANDO CONVERSACIÓN:',
+    } catch (
       error
-    );
+    ) {
+      try {
+        await client.query(
+          'ROLLBACK'
+        );
+      } catch (_) {}
 
-    return res.status(500).json({
-      success: false,
-      message:
-        'No se pudo crear la conversación',
-      error:
-        error.message,
-    });
+      console.error(
+        'ERROR CREANDO CONVERSACIÓN:',
+        error
+      );
 
-  } finally {
-    client.release();
-  }
-};
+      return res
+        .status(500)
+        .json({
+          success:
+            false,
+
+          message:
+            'No se pudo crear la conversación',
+
+          error:
+            error.message,
+        });
+
+    } finally {
+      client.release();
+    }
+  };
 
 
 // ============================================================
@@ -272,113 +334,133 @@ exports.listarConversaciones =
   ) => {
     try {
       const usuarioId =
-        obtenerUsuarioId(req);
+        obtenerUsuarioId(
+          req
+        );
 
       if (!usuarioId) {
-        return res.status(401).json({
-          success: false,
-          message:
-            'Usuario no autenticado',
-        });
+        return res
+          .status(401)
+          .json({
+            success:
+              false,
+
+            message:
+              'Usuario no autenticado',
+          });
       }
 
       const resultado =
         await pool.query(
           `
-            SELECT
-              c.id,
-              c.created_at,
-              c.updated_at,
+          SELECT
+            c.id,
+            c.created_at,
+            c.updated_at,
 
-              otro.usuario_id
-                AS otro_usuario_id,
+            otro.usuario_id
+              AS otro_usuario_id,
 
-              u.nombre,
+            u.nombre,
 
-              '' AS apellido,
+            '' AS apellido,
 
-              u.correo,
+            u.correo,
 
-              u.foto_perfil_url
-                AS imagen_usuario_url,
+            u.foto_perfil_url
+              AS imagen_usuario_url,
 
-              (
-                SELECT
-                  m.contenido
-                FROM mensajes m
-                WHERE
-                  m.conversacion_id =
-                    c.id
-                ORDER BY
-                  m.created_at DESC,
-                  m.id DESC
-                LIMIT 1
-              )
-                AS ultimo_mensaje,
+            (
+              SELECT
+                m.contenido
 
-              (
-                SELECT
-                  m.created_at
-                FROM mensajes m
-                WHERE
-                  m.conversacion_id =
-                    c.id
-                ORDER BY
-                  m.created_at DESC,
-                  m.id DESC
-                LIMIT 1
-              )
-                AS ultimo_mensaje_fecha,
+              FROM mensajes m
 
-              (
-                SELECT COUNT(*)
-                FROM mensajes m
-                WHERE
-                  m.conversacion_id =
-                    c.id
+              WHERE
+                m.conversacion_id =
+                  c.id
 
-                  AND
-                    m.remitente_id <>
+              ORDER BY
+                m.created_at DESC,
+                m.id DESC
+
+              LIMIT 1
+            )
+              AS ultimo_mensaje,
+
+            (
+              SELECT
+                m.created_at
+
+              FROM mensajes m
+
+              WHERE
+                m.conversacion_id =
+                  c.id
+
+              ORDER BY
+                m.created_at DESC,
+                m.id DESC
+
+              LIMIT 1
+            )
+              AS ultimo_mensaje_fecha,
+
+            (
+              SELECT COUNT(*)
+
+              FROM mensajes m
+
+              WHERE
+                m.conversacion_id =
+                  c.id
+
+                AND
+                  m.remitente_id <>
                     $1
 
-                  AND
-                    m.leido =
+                AND
+                  m.leido =
                     FALSE
-              )::INTEGER
-                AS mensajes_no_leidos
+            )::INTEGER
+              AS mensajes_no_leidos
 
-            FROM conversaciones c
+          FROM conversaciones c
 
-            JOIN participantes_conversacion yo
-              ON yo.conversacion_id =
-                 c.id
-              AND yo.usuario_id =
-                  $1
+          JOIN participantes_conversacion yo
+            ON yo.conversacion_id =
+              c.id
 
-            JOIN participantes_conversacion otro
-              ON otro.conversacion_id =
-                 c.id
-              AND otro.usuario_id <>
-                  $1
+            AND yo.usuario_id =
+              $1
 
-            JOIN usuarios u
-              ON u.id =
-                 otro.usuario_id
+          JOIN participantes_conversacion otro
+            ON otro.conversacion_id =
+              c.id
 
-            ORDER BY
-              COALESCE(
-                (
-                  SELECT
-                    MAX(
-                      m.created_at
-                    )
-                  FROM mensajes m
-                  WHERE
-                    m.conversacion_id =
-                      c.id
-                ),
-                c.updated_at
-              ) DESC
+            AND otro.usuario_id <>
+              $1
+
+          JOIN usuarios u
+            ON u.id =
+              otro.usuario_id
+
+          ORDER BY
+            COALESCE(
+              (
+                SELECT
+                  MAX(
+                    m.created_at
+                  )
+
+                FROM mensajes m
+
+                WHERE
+                  m.conversacion_id =
+                    c.id
+              ),
+              c.updated_at
+            ) DESC
           `,
           [
             usuarioId,
@@ -386,24 +468,33 @@ exports.listarConversaciones =
         );
 
       return res.json({
-        success: true,
+        success:
+          true,
+
         conversaciones:
           resultado.rows,
       });
 
-    } catch (error) {
+    } catch (
+      error
+    ) {
       console.error(
         'ERROR LISTANDO CONVERSACIONES:',
         error
       );
 
-      return res.status(500).json({
-        success: false,
-        message:
-          'No se pudieron cargar las conversaciones',
-        error:
-          error.message,
-      });
+      return res
+        .status(500)
+        .json({
+          success:
+            false,
+
+          message:
+            'No se pudieron cargar las conversaciones',
+
+          error:
+            error.message,
+        });
     }
   };
 
@@ -421,7 +512,9 @@ exports.obtenerMensajes =
   ) => {
     try {
       const usuarioId =
-        obtenerUsuarioId(req);
+        obtenerUsuarioId(
+          req
+        );
 
       const conversacionId =
         Number(
@@ -429,11 +522,15 @@ exports.obtenerMensajes =
         );
 
       if (!usuarioId) {
-        return res.status(401).json({
-          success: false,
-          message:
-            'Usuario no autenticado',
-        });
+        return res
+          .status(401)
+          .json({
+            success:
+              false,
+
+            message:
+              'Usuario no autenticado',
+          });
       }
 
       if (
@@ -441,11 +538,15 @@ exports.obtenerMensajes =
           conversacionId
         )
       ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            'ID de conversación inválido',
-        });
+        return res
+          .status(400)
+          .json({
+            success:
+              false,
+
+            message:
+              'ID de conversación inválido',
+          });
       }
 
       // ======================================================
@@ -455,13 +556,16 @@ exports.obtenerMensajes =
       const pertenece =
         await pool.query(
           `
-            SELECT
-              id
-            FROM participantes_conversacion
-            WHERE
-              conversacion_id = $1
-              AND usuario_id = $2
-            LIMIT 1
+          SELECT
+            id
+
+          FROM participantes_conversacion
+
+          WHERE
+            conversacion_id = $1
+            AND usuario_id = $2
+
+          LIMIT 1
           `,
           [
             conversacionId,
@@ -473,11 +577,15 @@ exports.obtenerMensajes =
         pertenece.rowCount ===
         0
       ) {
-        return res.status(403).json({
-          success: false,
-          message:
-            'No tienes acceso a esta conversación',
-        });
+        return res
+          .status(403)
+          .json({
+            success:
+              false,
+
+            message:
+              'No tienes acceso a esta conversación',
+          });
       }
 
       // ======================================================
@@ -487,32 +595,34 @@ exports.obtenerMensajes =
       const resultado =
         await pool.query(
           `
-            SELECT
-              m.id,
-              m.conversacion_id,
-              m.remitente_id,
-              m.contenido,
-              m.leido,
-              m.created_at,
+          SELECT
+            m.id,
+            m.conversacion_id,
+            m.remitente_id,
+            m.contenido,
+            m.leido,
+            m.created_at,
 
-              CASE
-                WHEN
-                  m.remitente_id =
+            CASE
+              WHEN
+                m.remitente_id =
                   $2
+
                 THEN TRUE
-                ELSE FALSE
-              END
-                AS es_mio
 
-            FROM mensajes m
+              ELSE FALSE
+            END
+              AS es_mio
 
-            WHERE
-              m.conversacion_id =
-                $1
+          FROM mensajes m
 
-            ORDER BY
-              m.created_at ASC,
-              m.id ASC
+          WHERE
+            m.conversacion_id =
+              $1
+
+          ORDER BY
+            m.created_at ASC,
+            m.id ASC
           `,
           [
             conversacionId,
@@ -521,24 +631,33 @@ exports.obtenerMensajes =
         );
 
       return res.json({
-        success: true,
+        success:
+          true,
+
         mensajes:
           resultado.rows,
       });
 
-    } catch (error) {
+    } catch (
+      error
+    ) {
       console.error(
         'ERROR OBTENIENDO MENSAJES:',
         error
       );
 
-      return res.status(500).json({
-        success: false,
-        message:
-          'No se pudieron cargar los mensajes',
-        error:
-          error.message,
-      });
+      return res
+        .status(500)
+        .json({
+          success:
+            false,
+
+          message:
+            'No se pudieron cargar los mensajes',
+
+          error:
+            error.message,
+        });
     }
   };
 
@@ -559,7 +678,9 @@ exports.enviarMensaje =
 
     try {
       const usuarioId =
-        obtenerUsuarioId(req);
+        obtenerUsuarioId(
+          req
+        );
 
       const conversacionId =
         Number(
@@ -571,43 +692,71 @@ exports.enviarMensaje =
           ?.toString()
           .trim();
 
+      // ======================================================
+      // VALIDAR USUARIO
+      // ======================================================
+
       if (!usuarioId) {
-        return res.status(401).json({
-          success: false,
-          message:
-            'Usuario no autenticado',
-        });
+        return res
+          .status(401)
+          .json({
+            success:
+              false,
+
+            message:
+              'Usuario no autenticado',
+          });
       }
+
+      // ======================================================
+      // VALIDAR CONVERSACIÓN
+      // ======================================================
 
       if (
         !Number.isInteger(
           conversacionId
         )
       ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            'Conversación inválida',
-        });
+        return res
+          .status(400)
+          .json({
+            success:
+              false,
+
+            message:
+              'Conversación inválida',
+          });
       }
 
+      // ======================================================
+      // VALIDAR MENSAJE
+      // ======================================================
+
       if (!contenido) {
-        return res.status(400).json({
-          success: false,
-          message:
-            'El mensaje no puede estar vacío',
-        });
+        return res
+          .status(400)
+          .json({
+            success:
+              false,
+
+            message:
+              'El mensaje no puede estar vacío',
+          });
       }
 
       if (
         contenido.length >
         5000
       ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            'El mensaje es demasiado largo',
-        });
+        return res
+          .status(400)
+          .json({
+            success:
+              false,
+
+            message:
+              'El mensaje es demasiado largo',
+          });
       }
 
       // ======================================================
@@ -617,13 +766,16 @@ exports.enviarMensaje =
       const pertenece =
         await client.query(
           `
-            SELECT
-              id
-            FROM participantes_conversacion
-            WHERE
-              conversacion_id = $1
-              AND usuario_id = $2
-            LIMIT 1
+          SELECT
+            id
+
+          FROM participantes_conversacion
+
+          WHERE
+            conversacion_id = $1
+            AND usuario_id = $2
+
+          LIMIT 1
           `,
           [
             conversacionId,
@@ -635,27 +787,34 @@ exports.enviarMensaje =
         pertenece.rowCount ===
         0
       ) {
-        return res.status(403).json({
-          success: false,
-          message:
-            'No tienes acceso a esta conversación',
-        });
+        return res
+          .status(403)
+          .json({
+            success:
+              false,
+
+            message:
+              'No tienes acceso a esta conversación',
+          });
       }
 
       // ======================================================
-      // DESTINATARIO
+      // OBTENER DESTINATARIO
       // ======================================================
 
       const destinatarioResultado =
         await client.query(
           `
-            SELECT
-              usuario_id
-            FROM participantes_conversacion
-            WHERE
-              conversacion_id = $1
-              AND usuario_id <> $2
-            LIMIT 1
+          SELECT
+            usuario_id
+
+          FROM participantes_conversacion
+
+          WHERE
+            conversacion_id = $1
+            AND usuario_id <> $2
+
+          LIMIT 1
           `,
           [
             conversacionId,
@@ -667,11 +826,15 @@ exports.enviarMensaje =
         destinatarioResultado
           .rowCount === 0
       ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            'No se encontró el destinatario',
-        });
+        return res
+          .status(400)
+          .json({
+            success:
+              false,
+
+            message:
+              'No se encontró el destinatario',
+          });
       }
 
       const destinatarioId =
@@ -682,6 +845,44 @@ exports.enviarMensaje =
         );
 
       // ======================================================
+      // DATOS DEL REMITENTE PARA LA NOTIFICACIÓN
+      // ======================================================
+
+      const remitenteResultado =
+        await client.query(
+          `
+          SELECT
+            id,
+            nombre,
+            foto_perfil_url
+
+          FROM usuarios
+
+          WHERE id = $1
+
+          LIMIT 1
+          `,
+          [
+            usuarioId,
+          ]
+        );
+
+      const remitente =
+        remitenteResultado
+          .rows[0];
+
+      const nombreRemitente =
+        remitente?.nombre
+          ?.toString()
+          .trim();
+
+      const tituloNotificacion =
+        nombreRemitente &&
+        nombreRemitente.isNotEmpty
+          ? nombreRemitente
+          : 'Nuevo mensaje';
+
+      // ======================================================
       // TRANSACCIÓN
       // ======================================================
 
@@ -689,31 +890,36 @@ exports.enviarMensaje =
         'BEGIN'
       );
 
+      // ======================================================
+      // GUARDAR MENSAJE
+      // ======================================================
+
       const resultado =
         await client.query(
           `
-            INSERT INTO mensajes (
-              conversacion_id,
-              remitente_id,
-              contenido,
-              leido,
-              created_at
-            )
-            VALUES (
-              $1,
-              $2,
-              $3,
-              FALSE,
-              NOW()
-            )
+          INSERT INTO mensajes (
+            conversacion_id,
+            remitente_id,
+            contenido,
+            leido,
+            created_at
+          )
 
-            RETURNING
-              id,
-              conversacion_id,
-              remitente_id,
-              contenido,
-              leido,
-              created_at
+          VALUES (
+            $1,
+            $2,
+            $3,
+            FALSE,
+            NOW()
+          )
+
+          RETURNING
+            id,
+            conversacion_id,
+            remitente_id,
+            contenido,
+            leido,
+            created_at
           `,
           [
             conversacionId,
@@ -722,13 +928,20 @@ exports.enviarMensaje =
           ]
         );
 
+      // ======================================================
+      // ACTUALIZAR CONVERSACIÓN
+      // ======================================================
+
       await client.query(
         `
-          UPDATE conversaciones
-          SET updated_at =
+        UPDATE conversaciones
+
+        SET
+          updated_at =
             NOW()
-          WHERE id =
-            $1
+
+        WHERE id =
+          $1
         `,
         [
           conversacionId,
@@ -792,7 +1005,7 @@ exports.enviarMensaje =
         );
 
         // ====================================================
-        // LISTA DESTINATARIO
+        // ACTUALIZAR LISTA DESTINATARIO
         // ====================================================
 
         io.to(
@@ -806,7 +1019,7 @@ exports.enviarMensaje =
         );
 
         // ====================================================
-        // LISTA REMITENTE
+        // ACTUALIZAR LISTA REMITENTE
         // ====================================================
 
         io.to(
@@ -820,12 +1033,60 @@ exports.enviarMensaje =
         );
       }
 
-      return res.status(201).json({
-        success: true,
-        mensaje,
-      });
+      // ======================================================
+      // CREAR NOTIFICACIÓN INTERNA
+      //
+      // Si falla la notificación, NO falla el mensaje.
+      // ======================================================
 
-    } catch (error) {
+      try {
+        await crearNotificacion({
+          usuarioId:
+            destinatarioId,
+
+          tipo:
+            'mensaje',
+
+          titulo:
+            tituloNotificacion,
+
+          mensaje:
+            contenido,
+
+          referenciaId:
+            conversacionId,
+
+          referenciaTipo:
+            'conversacion',
+
+          io:
+            io,
+        });
+      } catch (
+        errorNotificacion
+      ) {
+        console.error(
+          'ERROR CREANDO NOTIFICACIÓN DE MENSAJE:',
+          errorNotificacion
+        );
+      }
+
+      // ======================================================
+      // RESPUESTA
+      // ======================================================
+
+      return res
+        .status(201)
+        .json({
+          success:
+            true,
+
+          mensaje,
+        });
+
+    } catch (
+      error
+    ) {
       try {
         await client.query(
           'ROLLBACK'
@@ -837,13 +1098,18 @@ exports.enviarMensaje =
         error
       );
 
-      return res.status(500).json({
-        success: false,
-        message:
-          'No se pudo enviar el mensaje',
-        error:
-          error.message,
-      });
+      return res
+        .status(500)
+        .json({
+          success:
+            false,
+
+          message:
+            'No se pudo enviar el mensaje',
+
+          error:
+            error.message,
+        });
 
     } finally {
       client.release();
@@ -864,7 +1130,9 @@ exports.marcarComoLeidos =
   ) => {
     try {
       const usuarioId =
-        obtenerUsuarioId(req);
+        obtenerUsuarioId(
+          req
+        );
 
       const conversacionId =
         Number(
@@ -872,11 +1140,15 @@ exports.marcarComoLeidos =
         );
 
       if (!usuarioId) {
-        return res.status(401).json({
-          success: false,
-          message:
-            'Usuario no autenticado',
-        });
+        return res
+          .status(401)
+          .json({
+            success:
+              false,
+
+            message:
+              'Usuario no autenticado',
+          });
       }
 
       if (
@@ -884,11 +1156,15 @@ exports.marcarComoLeidos =
           conversacionId
         )
       ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            'Conversación inválida',
-        });
+        return res
+          .status(400)
+          .json({
+            success:
+              false,
+
+            message:
+              'Conversación inválida',
+          });
       }
 
       // ======================================================
@@ -898,13 +1174,16 @@ exports.marcarComoLeidos =
       const pertenece =
         await pool.query(
           `
-            SELECT
-              id
-            FROM participantes_conversacion
-            WHERE
-              conversacion_id = $1
-              AND usuario_id = $2
-            LIMIT 1
+          SELECT
+            id
+
+          FROM participantes_conversacion
+
+          WHERE
+            conversacion_id = $1
+            AND usuario_id = $2
+
+          LIMIT 1
           `,
           [
             conversacionId,
@@ -916,46 +1195,89 @@ exports.marcarComoLeidos =
         pertenece.rowCount ===
         0
       ) {
-        return res.status(403).json({
-          success: false,
-          message:
-            'No tienes acceso a esta conversación',
-        });
+        return res
+          .status(403)
+          .json({
+            success:
+              false,
+
+            message:
+              'No tienes acceso a esta conversación',
+          });
       }
 
       // ======================================================
-      // MARCAR COMO LEÍDOS
+      // MARCAR MENSAJES COMO LEÍDOS
       // ======================================================
 
       const resultado =
         await pool.query(
           `
-            UPDATE mensajes
+          UPDATE mensajes
 
-            SET leido =
+          SET
+            leido =
               TRUE
 
-            WHERE
-              conversacion_id =
-                $1
+          WHERE
+            conversacion_id =
+              $1
 
-              AND
-                remitente_id <>
+            AND
+              remitente_id <>
                 $2
 
-              AND
-                leido =
+            AND
+              leido =
                 FALSE
 
-            RETURNING
-              id,
-              remitente_id
+          RETURNING
+            id,
+            remitente_id
           `,
           [
             conversacionId,
             usuarioId,
           ]
         );
+
+      // ======================================================
+      // TAMBIÉN MARCAR NOTIFICACIONES DEL CHAT COMO LEÍDAS
+      // ======================================================
+
+      await pool.query(
+        `
+        UPDATE notificaciones
+
+        SET
+          leida =
+            TRUE
+
+        WHERE
+          usuario_id =
+            $1
+
+          AND
+            tipo =
+              'mensaje'
+
+          AND
+            referencia_tipo =
+              'conversacion'
+
+          AND
+            referencia_id =
+              $2
+
+          AND
+            leida =
+              FALSE
+        `,
+        [
+          usuarioId,
+          conversacionId,
+        ]
+      );
 
       // ======================================================
       // SOCKET.IO
@@ -968,7 +1290,8 @@ exports.marcarComoLeidos =
 
       if (
         io &&
-        resultado.rowCount > 0
+        resultado.rowCount >
+          0
       ) {
         // ====================================================
         // AGRUPAR REMITENTES
@@ -1037,25 +1360,52 @@ exports.marcarComoLeidos =
         );
       }
 
+      // ======================================================
+      // ACTUALIZAR NOTIFICACIONES DEL LECTOR
+      // ======================================================
+
+      if (io) {
+        io.to(
+          `usuario:${usuarioId}`
+        ).emit(
+          'notificaciones_actualizadas',
+          {
+            referencia_tipo:
+              'conversacion',
+
+            referencia_id:
+              conversacionId,
+          }
+        );
+      }
+
       return res.json({
-        success: true,
+        success:
+          true,
 
         actualizados:
           resultado.rowCount,
       });
 
-    } catch (error) {
+    } catch (
+      error
+    ) {
       console.error(
         'ERROR MARCANDO LEÍDOS:',
         error
       );
 
-      return res.status(500).json({
-        success: false,
-        message:
-          'No se pudieron actualizar los mensajes',
-        error:
-          error.message,
-      });
+      return res
+        .status(500)
+        .json({
+          success:
+            false,
+
+          message:
+            'No se pudieron actualizar los mensajes',
+
+          error:
+            error.message,
+        });
     }
   };

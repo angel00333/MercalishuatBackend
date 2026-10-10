@@ -27,31 +27,49 @@ const publicacionRoutes =
 const chatRoutes =
   require('./routes/chat.routes');
 
+const notificacionRoutes =
+  require(
+    './routes/notificacion.routes'
+  );
+
 const app = express();
-
-
 
 
 // =======================================
 // MIDDLEWARES
 // =======================================
 
-app.use(cors());
+app.use(
+  cors()
+);
 
-app.use(express.json());
+app.use(
+  express.json()
+);
 
 
 // =======================================
 // INICIO
 // =======================================
 
-app.get('/', (req, res) => {
-  res.json({
-    nombre: 'Mercalishuat API',
-    estado: 'online',
-    version: 'Beta 2',
-  });
-});
+app.get(
+  '/',
+  (
+    req,
+    res
+  ) => {
+    res.json({
+      nombre:
+        'Mercalishuat API',
+
+      estado:
+        'online',
+
+      version:
+        'Beta 5.2',
+    });
+  }
+);
 
 
 // =======================================
@@ -95,48 +113,74 @@ app.use(
 
 app.use(
   '/api/chat',
-  chatRoutes,
+  chatRoutes
 );
 
-// =======================================
-// 404 Imagenes
-// =======================================
 app.use(
-  (error, req, res, next) => {
+  '/api/notificaciones',
+  notificacionRoutes
+);
 
+
+// =======================================
+// ERRORES DE IMÁGENES
+// =======================================
+
+app.use(
+  (
+    error,
+    req,
+    res,
+    next
+  ) => {
     if (
       error.code ===
       'LIMIT_FILE_SIZE'
     ) {
-
-      return res.status(400).json({
-        message:
-          'La imagen no puede superar los 5 MB',
-      });
+      return res
+        .status(400)
+        .json({
+          message:
+            'La imagen no puede superar los 5 MB',
+        });
     }
 
-
-    if (error.message) {
-
-      return res.status(400).json({
-        message:
-          error.message,
-      });
+    if (
+      error.message
+    ) {
+      return res
+        .status(400)
+        .json({
+          message:
+            error.message,
+        });
     }
 
-
-    next(error);
+    next(
+      error
+    );
   }
 );
+
+
 // =======================================
 // 404
 // =======================================
 
-app.use((req, res) => {
-  res.status(404).json({
-    message: 'Ruta no encontrada',
-  });
-});
+app.use(
+  (
+    req,
+    res
+  ) => {
+    res
+      .status(404)
+      .json({
+        message:
+          'Ruta no encontrada',
+      });
+  }
+);
 
 
-module.exports = app;
+module.exports =
+  app;
