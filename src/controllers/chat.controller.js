@@ -1,5 +1,4 @@
-const pool =
-  require('../config/db');
+const pool = require('../config/db');
 
 const {
   crearNotificacion,
@@ -12,9 +11,7 @@ const {
 // UTILIDAD
 // ============================================================
 
-function obtenerUsuarioId(
-  req
-) {
+function obtenerUsuarioId(req) {
   return (
     req.usuario?.id ||
     req.user?.id ||
@@ -35,18 +32,13 @@ function obtenerUsuarioId(
 // ============================================================
 
 exports.crearConversacion =
-  async (
-    req,
-    res
-  ) => {
+  async (req, res) => {
     const client =
       await pool.connect();
 
     try {
       const usuarioId =
-        obtenerUsuarioId(
-          req
-        );
+        obtenerUsuarioId(req);
 
       const {
         usuario_destino_id,
@@ -60,9 +52,7 @@ exports.crearConversacion =
         return res
           .status(401)
           .json({
-            success:
-              false,
-
+            success: false,
             message:
               'Usuario no autenticado',
           });
@@ -76,9 +66,7 @@ exports.crearConversacion =
         return res
           .status(400)
           .json({
-            success:
-              false,
-
+            success: false,
             message:
               'Falta usuario_destino_id',
           });
@@ -97,9 +85,7 @@ exports.crearConversacion =
         return res
           .status(400)
           .json({
-            success:
-              false,
-
+            success: false,
             message:
               'ID de usuario destinatario inválido',
           });
@@ -110,23 +96,20 @@ exports.crearConversacion =
       // ======================================================
 
       if (
-        Number(
-          usuarioId
-        ) === destinoId
+        Number(usuarioId) ===
+        destinoId
       ) {
         return res
           .status(400)
           .json({
-            success:
-              false,
-
+            success: false,
             message:
               'No puedes iniciar una conversación contigo mismo',
           });
       }
 
       // ======================================================
-      // VERIFICAR DESTINATARIO
+      // VERIFICAR QUE EL DESTINATARIO EXISTA
       // ======================================================
 
       const usuarioExiste =
@@ -147,15 +130,12 @@ exports.crearConversacion =
         );
 
       if (
-        usuarioExiste.rowCount ===
-        0
+        usuarioExiste.rowCount === 0
       ) {
         return res
           .status(404)
           .json({
-            success:
-              false,
-
+            success: false,
             message:
               'El usuario destinatario no existe',
           });
@@ -200,18 +180,13 @@ exports.crearConversacion =
 
       if (
         conversacionExistente
-          .rowCount >
-        0
+          .rowCount > 0
       ) {
         return res
           .status(200)
           .json({
-            success:
-              true,
-
-            creada:
-              false,
-
+            success: true,
+            creada: false,
             conversacion_id:
               conversacionExistente
                 .rows[0]
@@ -250,7 +225,7 @@ exports.crearConversacion =
           .id;
 
       // ======================================================
-      // AGREGAR PARTICIPANTES
+      // AGREGAR LOS DOS PARTICIPANTES
       // ======================================================
 
       await client.query(
@@ -278,19 +253,13 @@ exports.crearConversacion =
       return res
         .status(201)
         .json({
-          success:
-            true,
-
-          creada:
-            true,
-
+          success: true,
+          creada: true,
           conversacion_id:
             conversacionId,
         });
 
-    } catch (
-      error
-    ) {
+    } catch (error) {
       try {
         await client.query(
           'ROLLBACK'
@@ -305,12 +274,9 @@ exports.crearConversacion =
       return res
         .status(500)
         .json({
-          success:
-            false,
-
+          success: false,
           message:
             'No se pudo crear la conversación',
-
           error:
             error.message,
         });
@@ -328,23 +294,16 @@ exports.crearConversacion =
 // ============================================================
 
 exports.listarConversaciones =
-  async (
-    req,
-    res
-  ) => {
+  async (req, res) => {
     try {
       const usuarioId =
-        obtenerUsuarioId(
-          req
-        );
+        obtenerUsuarioId(req);
 
       if (!usuarioId) {
         return res
           .status(401)
           .json({
-            success:
-              false,
-
+            success: false,
             message:
               'Usuario no autenticado',
           });
@@ -407,7 +366,8 @@ exports.listarConversaciones =
               AS ultimo_mensaje_fecha,
 
             (
-              SELECT COUNT(*)
+              SELECT
+                COUNT(*)
 
               FROM mensajes m
 
@@ -468,16 +428,12 @@ exports.listarConversaciones =
         );
 
       return res.json({
-        success:
-          true,
-
+        success: true,
         conversaciones:
           resultado.rows,
       });
 
-    } catch (
-      error
-    ) {
+    } catch (error) {
       console.error(
         'ERROR LISTANDO CONVERSACIONES:',
         error
@@ -486,12 +442,9 @@ exports.listarConversaciones =
       return res
         .status(500)
         .json({
-          success:
-            false,
-
+          success: false,
           message:
             'No se pudieron cargar las conversaciones',
-
           error:
             error.message,
         });
@@ -506,32 +459,33 @@ exports.listarConversaciones =
 // ============================================================
 
 exports.obtenerMensajes =
-  async (
-    req,
-    res
-  ) => {
+  async (req, res) => {
     try {
       const usuarioId =
-        obtenerUsuarioId(
-          req
-        );
+        obtenerUsuarioId(req);
 
       const conversacionId =
         Number(
           req.params.id
         );
 
+      // ======================================================
+      // VALIDAR USUARIO
+      // ======================================================
+
       if (!usuarioId) {
         return res
           .status(401)
           .json({
-            success:
-              false,
-
+            success: false,
             message:
               'Usuario no autenticado',
           });
       }
+
+      // ======================================================
+      // VALIDAR CONVERSACIÓN
+      // ======================================================
 
       if (
         !Number.isInteger(
@@ -541,9 +495,7 @@ exports.obtenerMensajes =
         return res
           .status(400)
           .json({
-            success:
-              false,
-
+            success: false,
             message:
               'ID de conversación inválido',
           });
@@ -574,22 +526,19 @@ exports.obtenerMensajes =
         );
 
       if (
-        pertenece.rowCount ===
-        0
+        pertenece.rowCount === 0
       ) {
         return res
           .status(403)
           .json({
-            success:
-              false,
-
+            success: false,
             message:
               'No tienes acceso a esta conversación',
           });
       }
 
       // ======================================================
-      // MENSAJES
+      // OBTENER MENSAJES
       // ======================================================
 
       const resultado =
@@ -607,9 +556,7 @@ exports.obtenerMensajes =
               WHEN
                 m.remitente_id =
                   $2
-
-                THEN TRUE
-
+              THEN TRUE
               ELSE FALSE
             END
               AS es_mio
@@ -631,16 +578,12 @@ exports.obtenerMensajes =
         );
 
       return res.json({
-        success:
-          true,
-
+        success: true,
         mensajes:
           resultado.rows,
       });
 
-    } catch (
-      error
-    ) {
+    } catch (error) {
       console.error(
         'ERROR OBTENIENDO MENSAJES:',
         error
@@ -649,12 +592,9 @@ exports.obtenerMensajes =
       return res
         .status(500)
         .json({
-          success:
-            false,
-
+          success: false,
           message:
             'No se pudieron cargar los mensajes',
-
           error:
             error.message,
         });
@@ -669,18 +609,13 @@ exports.obtenerMensajes =
 // ============================================================
 
 exports.enviarMensaje =
-  async (
-    req,
-    res
-  ) => {
+  async (req, res) => {
     const client =
       await pool.connect();
 
     try {
       const usuarioId =
-        obtenerUsuarioId(
-          req
-        );
+        obtenerUsuarioId(req);
 
       const conversacionId =
         Number(
@@ -700,9 +635,7 @@ exports.enviarMensaje =
         return res
           .status(401)
           .json({
-            success:
-              false,
-
+            success: false,
             message:
               'Usuario no autenticado',
           });
@@ -720,9 +653,7 @@ exports.enviarMensaje =
         return res
           .status(400)
           .json({
-            success:
-              false,
-
+            success: false,
             message:
               'Conversación inválida',
           });
@@ -736,24 +667,19 @@ exports.enviarMensaje =
         return res
           .status(400)
           .json({
-            success:
-              false,
-
+            success: false,
             message:
               'El mensaje no puede estar vacío',
           });
       }
 
       if (
-        contenido.length >
-        5000
+        contenido.length > 5000
       ) {
         return res
           .status(400)
           .json({
-            success:
-              false,
-
+            success: false,
             message:
               'El mensaje es demasiado largo',
           });
@@ -784,15 +710,12 @@ exports.enviarMensaje =
         );
 
       if (
-        pertenece.rowCount ===
-        0
+        pertenece.rowCount === 0
       ) {
         return res
           .status(403)
           .json({
-            success:
-              false,
-
+            success: false,
             message:
               'No tienes acceso a esta conversación',
           });
@@ -829,9 +752,7 @@ exports.enviarMensaje =
         return res
           .status(400)
           .json({
-            success:
-              false,
-
+            success: false,
             message:
               'No se encontró el destinatario',
           });
@@ -845,7 +766,9 @@ exports.enviarMensaje =
         );
 
       // ======================================================
-      // DATOS DEL REMITENTE PARA LA NOTIFICACIÓN
+      // DATOS DEL REMITENTE
+      //
+      // Se usan para mostrar el nombre real en la notificación.
       // ======================================================
 
       const remitenteResultado =
@@ -876,11 +799,13 @@ exports.enviarMensaje =
           ?.toString()
           .trim();
 
+      // IMPORTANTE:
+      // En JavaScript no existe .isNotEmpty.
       const tituloNotificacion =
         nombreRemitente &&
-        nombreRemitente.isNotEmpty
+        nombreRemitente.length > 0
           ? nombreRemitente
-          : 'Nuevo mensaje';
+          : 'Usuario';
 
       // ======================================================
       // TRANSACCIÓN
@@ -929,7 +854,7 @@ exports.enviarMensaje =
         );
 
       // ======================================================
-      // ACTUALIZAR CONVERSACIÓN
+      // ACTUALIZAR FECHA DE CONVERSACIÓN
       // ======================================================
 
       await client.query(
@@ -953,7 +878,7 @@ exports.enviarMensaje =
       );
 
       // ======================================================
-      // MENSAJE
+      // MENSAJE RESULTANTE
       // ======================================================
 
       const mensaje =
@@ -973,7 +898,7 @@ exports.enviarMensaje =
 
       if (io) {
         // ====================================================
-        // MENSAJE DESTINATARIO
+        // ENVIAR MENSAJE AL DESTINATARIO
         // ====================================================
 
         io.to(
@@ -1005,7 +930,7 @@ exports.enviarMensaje =
         );
 
         // ====================================================
-        // ACTUALIZAR LISTA DESTINATARIO
+        // ACTUALIZAR LISTA DEL DESTINATARIO
         // ====================================================
 
         io.to(
@@ -1019,7 +944,7 @@ exports.enviarMensaje =
         );
 
         // ====================================================
-        // ACTUALIZAR LISTA REMITENTE
+        // ACTUALIZAR LISTA DEL REMITENTE
         // ====================================================
 
         io.to(
@@ -1036,7 +961,8 @@ exports.enviarMensaje =
       // ======================================================
       // CREAR NOTIFICACIÓN INTERNA
       //
-      // Si falla la notificación, NO falla el mensaje.
+      // Si falla la notificación, el mensaje ya enviado
+      // NO debe fallar.
       // ======================================================
 
       try {
@@ -1062,6 +988,7 @@ exports.enviarMensaje =
           io:
             io,
         });
+
       } catch (
         errorNotificacion
       ) {
@@ -1078,15 +1005,11 @@ exports.enviarMensaje =
       return res
         .status(201)
         .json({
-          success:
-            true,
-
+          success: true,
           mensaje,
         });
 
-    } catch (
-      error
-    ) {
+    } catch (error) {
       try {
         await client.query(
           'ROLLBACK'
@@ -1101,12 +1024,9 @@ exports.enviarMensaje =
       return res
         .status(500)
         .json({
-          success:
-            false,
-
+          success: false,
           message:
             'No se pudo enviar el mensaje',
-
           error:
             error.message,
         });
@@ -1124,32 +1044,33 @@ exports.enviarMensaje =
 // ============================================================
 
 exports.marcarComoLeidos =
-  async (
-    req,
-    res
-  ) => {
+  async (req, res) => {
     try {
       const usuarioId =
-        obtenerUsuarioId(
-          req
-        );
+        obtenerUsuarioId(req);
 
       const conversacionId =
         Number(
           req.params.id
         );
 
+      // ======================================================
+      // VALIDAR USUARIO
+      // ======================================================
+
       if (!usuarioId) {
         return res
           .status(401)
           .json({
-            success:
-              false,
-
+            success: false,
             message:
               'Usuario no autenticado',
           });
       }
+
+      // ======================================================
+      // VALIDAR CONVERSACIÓN
+      // ======================================================
 
       if (
         !Number.isInteger(
@@ -1159,9 +1080,7 @@ exports.marcarComoLeidos =
         return res
           .status(400)
           .json({
-            success:
-              false,
-
+            success: false,
             message:
               'Conversación inválida',
           });
@@ -1192,15 +1111,12 @@ exports.marcarComoLeidos =
         );
 
       if (
-        pertenece.rowCount ===
-        0
+        pertenece.rowCount === 0
       ) {
         return res
           .status(403)
           .json({
-            success:
-              false,
-
+            success: false,
             message:
               'No tienes acceso a esta conversación',
           });
@@ -1242,7 +1158,7 @@ exports.marcarComoLeidos =
         );
 
       // ======================================================
-      // TAMBIÉN MARCAR NOTIFICACIONES DEL CHAT COMO LEÍDAS
+      // MARCAR NOTIFICACIONES DE ESTA CONVERSACIÓN COMO LEÍDAS
       // ======================================================
 
       await pool.query(
@@ -1290,29 +1206,25 @@ exports.marcarComoLeidos =
 
       if (
         io &&
-        resultado.rowCount >
-          0
+        resultado.rowCount > 0
       ) {
         // ====================================================
         // AGRUPAR REMITENTES
         // ====================================================
 
-        const remitentes =
-          [
-            ...new Set(
-              resultado.rows.map(
-                (
-                  fila
-                ) =>
-                  Number(
-                    fila.remitente_id
-                  )
-              )
-            ),
-          ];
+        const remitentes = [
+          ...new Set(
+            resultado.rows.map(
+              (fila) =>
+                Number(
+                  fila.remitente_id
+                )
+            )
+          ),
+        ];
 
         // ====================================================
-        // AVISAR A CADA REMITENTE
+        // AVISAR AL REMITENTE QUE SUS MENSAJES FUERON LEÍDOS
         // ====================================================
 
         for (
@@ -1361,7 +1273,7 @@ exports.marcarComoLeidos =
       }
 
       // ======================================================
-      // ACTUALIZAR NOTIFICACIONES DEL LECTOR
+      // ACTUALIZAR CAMPANA / NOTIFICACIONES DEL LECTOR
       // ======================================================
 
       if (io) {
@@ -1379,17 +1291,17 @@ exports.marcarComoLeidos =
         );
       }
 
-      return res.json({
-        success:
-          true,
+      // ======================================================
+      // RESPUESTA
+      // ======================================================
 
+      return res.json({
+        success: true,
         actualizados:
           resultado.rowCount,
       });
 
-    } catch (
-      error
-    ) {
+    } catch (error) {
       console.error(
         'ERROR MARCANDO LEÍDOS:',
         error
@@ -1398,12 +1310,9 @@ exports.marcarComoLeidos =
       return res
         .status(500)
         .json({
-          success:
-            false,
-
+          success: false,
           message:
             'No se pudieron actualizar los mensajes',
-
           error:
             error.message,
         });
