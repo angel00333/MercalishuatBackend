@@ -1,10 +1,16 @@
 const pool =
   require('../config/db');
 
+const {
+  enviarPushUsuario,
+} = require(
+  './firebase_push.service'
+);
 
-// =======================================
+
+// ============================================================
 // CREAR NOTIFICACIÓN
-// =======================================
+// ============================================================
 
 async function crearNotificacion({
   usuarioId,
@@ -15,6 +21,10 @@ async function crearNotificacion({
   referenciaTipo = null,
   io = null,
 }) {
+  // ==========================================================
+  // GUARDAR EN POSTGRESQL
+  // ==========================================================
+
   const resultado =
     await pool.query(
       `
@@ -64,13 +74,11 @@ async function crearNotificacion({
   const notificacion =
     resultado.rows[0];
 
-  // =====================================
+  // ==========================================================
   // SOCKET.IO
-  // =====================================
+  // ==========================================================
 
-  if (
-    io
-  ) {
+  if (io) {
     io.to(
       `usuario:${usuarioId}`
     ).emit(
@@ -86,6 +94,43 @@ async function crearNotificacion({
         incrementar:
           1,
       }
+    );
+  }
+
+  // ==========================================================
+  // FIREBASE PUSH
+  //
+  // Si Firebase falla, la notificación interna sigue existiendo.
+  // ==========================================================
+
+  try {
+    await enviarPushUsuario({
+      usuarioId,
+
+      titulo,
+
+      mensaje,
+
+      data: {
+        tipo,
+
+        notificacion_id:
+          notificacion.id,
+
+        referencia_id:
+          referenciaId,
+
+        referencia_tipo:
+          referenciaTipo,
+      },
+    });
+
+  } catch (
+    error
+  ) {
+    console.error(
+      'ERROR PUSH DE NOTIFICACIÓN:',
+      error
     );
   }
 

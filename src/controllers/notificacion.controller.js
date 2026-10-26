@@ -395,20 +395,7 @@ exports.registrarTokenFcm =
           req
         );
 
-      const token =
-        req.body.token
-          ?.toString()
-          .trim();
-
-      const plataforma =
-        req.body.plataforma
-          ?.toString()
-          .trim() ||
-        'desconocida';
-
-      if (
-        !usuarioId
-      ) {
+      if (!usuarioId) {
         return res
           .status(401)
           .json({
@@ -420,9 +407,18 @@ exports.registrarTokenFcm =
           });
       }
 
-      if (
-        !token
-      ) {
+      const fid =
+        req.body.fid
+          ?.toString()
+          .trim();
+
+      const plataforma =
+        req.body.plataforma
+          ?.toString()
+          .trim() ||
+        'web';
+
+      if (!fid) {
         return res
           .status(400)
           .json({
@@ -430,7 +426,7 @@ exports.registrarTokenFcm =
               false,
 
             message:
-              'Token FCM requerido',
+              'Falta el FID',
           });
       }
 
@@ -438,7 +434,7 @@ exports.registrarTokenFcm =
         `
         INSERT INTO dispositivos_fcm (
           usuario_id,
-          token,
+          fid,
           plataforma,
           activo,
           updated_at
@@ -452,7 +448,7 @@ exports.registrarTokenFcm =
           NOW()
         )
 
-        ON CONFLICT (token)
+        ON CONFLICT (fid)
 
         DO UPDATE SET
           usuario_id =
@@ -469,7 +465,7 @@ exports.registrarTokenFcm =
         `,
         [
           usuarioId,
-          token,
+          fid,
           plataforma,
         ]
       );
@@ -479,14 +475,14 @@ exports.registrarTokenFcm =
           true,
 
         message:
-          'Token FCM registrado',
+          'Dispositivo registrado',
       });
 
     } catch (
       error
     ) {
       console.error(
-        'ERROR REGISTRANDO TOKEN FCM:',
+        'ERROR REGISTRANDO FID:',
         error
       );
 
@@ -504,8 +500,6 @@ exports.registrarTokenFcm =
         });
     }
   };
-
-
 // =======================================
 // ELIMINAR / DESACTIVAR TOKEN FCM
 // =======================================
@@ -521,36 +515,20 @@ exports.eliminarTokenFcm =
           req
         );
 
-      const token =
-        req.body.token
+      const fid =
+        req.body.fid
           ?.toString()
           .trim();
 
       if (
-        !usuarioId
-      ) {
-        return res
-          .status(401)
-          .json({
-            success:
-              false,
-
-            message:
-              'Usuario no autenticado',
-          });
-      }
-
-      if (
-        !token
+        !usuarioId ||
+        !fid
       ) {
         return res
           .status(400)
           .json({
             success:
               false,
-
-            message:
-              'Token requerido',
           });
       }
 
@@ -559,16 +537,23 @@ exports.eliminarTokenFcm =
         UPDATE dispositivos_fcm
 
         SET
-          activo = FALSE,
-          updated_at = NOW()
+          activo =
+            FALSE,
+
+          updated_at =
+            NOW()
 
         WHERE
-          usuario_id = $1
-          AND token = $2
+          usuario_id =
+            $1
+
+          AND
+            fid =
+              $2
         `,
         [
           usuarioId,
-          token,
+          fid,
         ]
       );
 
@@ -581,7 +566,7 @@ exports.eliminarTokenFcm =
       error
     ) {
       console.error(
-        'ERROR ELIMINANDO TOKEN FCM:',
+        'ERROR DESACTIVANDO FID:',
         error
       );
 
@@ -590,12 +575,6 @@ exports.eliminarTokenFcm =
         .json({
           success:
             false,
-
-          message:
-            'No se pudo eliminar el dispositivo',
-
-          error:
-            error.message,
         });
     }
   };
