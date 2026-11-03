@@ -34,6 +34,9 @@ const notificacionRoutes =
 
 const app = express();
 
+const adminRoutes =
+  require('./routes/admin.routes');
+
 
 // =======================================
 // MIDDLEWARES
@@ -75,6 +78,11 @@ app.get(
 // =======================================
 // RUTAS
 // =======================================
+
+app.use(
+  '/api/admin',
+  adminRoutes
+);
 
 app.use(
   '/api/perfil',
