@@ -36,8 +36,8 @@ async function obtenerDashboard() {
 
         (
           SELECT COUNT(*)::INTEGER
-          FROM tiendas
-        ) AS tiendas,
+          FROM emprendimientos
+        ) AS emprendimientos,
 
         (
           SELECT COUNT(*)::INTEGER
