@@ -2,7 +2,7 @@ const express =
   require('express');
 
 const adminMiddleware =
-  require('../middlewares/admin.middleware');
+  require('../middleware/admin.middleware');
 
 const adminController =
   require('../controllers/admin.controller');
