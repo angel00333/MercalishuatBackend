@@ -189,6 +189,7 @@ async function listarUsuarios({
         u.nombre,
         u.correo,
         u.rol_id,
+        u.activo,
 
         r.nombre AS rol
 
@@ -243,6 +244,7 @@ async function obtenerUsuarioPorId(
         u.nombre,
         u.correo,
         u.rol_id,
+        u.activo,
 
         r.nombre AS rol
 
@@ -266,7 +268,63 @@ async function obtenerUsuarioPorId(
   );
 }
 
+async function cambiarEstadoUsuario(
+  usuarioId,
+  activo,
+  administradorId
+) {
+  if (usuarioId === administradorId) {
+    const error = new Error(
+      'No puedes suspender tu propia cuenta'
+    );
+
+    error.status = 400;
+
+    throw error;
+  }
+
+  const existente = await pool.query(
+    `
+      SELECT
+        id,
+        nombre,
+        correo,
+        rol_id,
+        activo
+      FROM usuarios
+      WHERE id = $1
+      LIMIT 1
+    `,
+    [usuarioId]
+  );
+
+  if (existente.rowCount === 0) {
+    return null;
+  }
+
+  const resultado = await pool.query(
+    `
+      UPDATE usuarios
+      SET activo = $1
+      WHERE id = $2
+      RETURNING
+        id,
+        nombre,
+        correo,
+        rol_id,
+        activo
+    `,
+    [
+      activo,
+      usuarioId,
+    ]
+  );
+
+  return resultado.rows[0];
+}
+
 module.exports = {
+  cambiarEstadoUsuario,
   obtenerDashboard,
   listarUsuarios,
   obtenerUsuarioPorId,

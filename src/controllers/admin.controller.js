@@ -138,3 +138,78 @@ exports.obtenerUsuario =
       });
     }
   };
+
+exports.cambiarEstadoUsuario = async (
+  req,
+  res
+) => {
+  try {
+    const id =
+        Number(req.params.id);
+
+    if (
+        !Number.isInteger(id) ||
+        id <= 0
+    ) {
+      return res.status(400).json({
+        ok: false,
+        mensaje:
+            'ID de usuario inválido',
+      });
+    }
+
+    if (
+        typeof req.body.activo !==
+        'boolean'
+    ) {
+      return res.status(400).json({
+        ok: false,
+        mensaje:
+            'El campo activo debe ser true o false',
+      });
+    }
+
+    const usuario =
+        await adminService
+            .cambiarEstadoUsuario(
+      id,
+      req.body.activo,
+      Number(req.usuario.id),
+    );
+
+    if (!usuario) {
+      return res.status(404).json({
+        ok: false,
+        mensaje:
+            'Usuario no encontrado',
+      });
+    }
+
+    return res.status(200).json({
+      ok: true,
+
+      mensaje:
+          usuario.activo
+              ? 'Usuario reactivado correctamente'
+              : 'Usuario suspendido correctamente',
+
+      data:
+          usuario,
+    });
+  } catch (error) {
+    console.error(
+      'ERROR CAMBIANDO ESTADO USUARIO:',
+      error,
+    );
+
+    return res
+        .status(error.status || 500)
+        .json({
+      ok: false,
+
+      mensaje:
+          error.message ||
+          'Error modificando el estado del usuario',
+    });
+  }
+};

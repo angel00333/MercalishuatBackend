@@ -30,6 +30,10 @@ router.get(
 // ============================================================
 // USUARIOS
 // ============================================================
+router.patch(
+  '/usuarios/:id/estado',
+  adminController.cambiarEstadoUsuario
+);
 
 router.get(
   '/usuarios',
