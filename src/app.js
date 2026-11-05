@@ -189,16 +189,6 @@ app.use(
   }
 );
 
-router.get(
-  '/prueba',
-  (req, res) => {
-    return res.json({
-      ok: true,
-      mensaje:
-        'Rutas admin Beta 6.2 activas',
-    });
-  }
-);
 
 module.exports =
   app;
