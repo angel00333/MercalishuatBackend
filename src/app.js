@@ -37,6 +37,11 @@ const app = express();
 const adminRoutes =
   require('./routes/admin.routes');
 
+const reporteRoutes =
+  require(
+    './routes/reporte.routes'
+  );
+
 
 // =======================================
 // MIDDLEWARES
@@ -82,6 +87,11 @@ app.get(
 app.use(
   '/api/admin',
   adminRoutes
+);
+
+app.use(
+  '/api/reportes',
+  reporteRoutes
 );
 
 app.use(
@@ -169,6 +179,7 @@ app.use(
     );
   }
 );
+
 
 
 // =======================================
