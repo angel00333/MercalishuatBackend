@@ -1,7 +1,9 @@
 const express =
   require('express');
 
-const authMiddleware =
+const {
+  verificarToken
+} =
   require(
     '../middleware/auth.middleware'
   );
@@ -15,11 +17,11 @@ const router =
   express.Router();
 
 // ============================================================
-// TODO REPORTE REQUIERE SESIÓN
+// TODAS LAS RUTAS DE REPORTES REQUIEREN SESIÓN
 // ============================================================
 
 router.use(
-  authMiddleware
+  verificarToken
 );
 
 // ============================================================
