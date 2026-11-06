@@ -74,7 +74,7 @@ app.get(
         'online',
 
       version:
-        'Beta 5.2',
+        'Beta 6.2',
     });
   }
 );
