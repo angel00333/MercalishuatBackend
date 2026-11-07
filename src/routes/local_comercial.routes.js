@@ -11,6 +11,17 @@ const localComercialController =
     '../controllers/local_comercial.controller'
   );
 
+const localImagenController =
+  require(
+    '../controllers/local_comercial_imagen.controller'
+  );
+
+const {
+  subirImagenesLocal,
+} = require(
+  '../middleware/local_imagen.middleware'
+);
+
 
 const router =
   express.Router();
@@ -26,7 +37,7 @@ router.use(
 
 
 // ============================================================
-// LISTAR TODOS
+// LISTAR
 // ============================================================
 
 router.get(
@@ -37,12 +48,54 @@ router.get(
 
 // ============================================================
 // MIS LOCALES
-// IMPORTANTE: DEBE IR ANTES DE /:id
 // ============================================================
 
 router.get(
   '/mios',
   localComercialController.listarMios
+);
+
+
+// ============================================================
+// SUBIR IMÁGENES
+// ============================================================
+
+router.post(
+  '/:id/imagenes',
+  subirImagenesLocal,
+  localImagenController.subir
+);
+
+
+// ============================================================
+// ESTABLECER PRINCIPAL
+// ============================================================
+
+router.patch(
+  '/:id/imagenes/:imagenId/principal',
+  localImagenController
+      .establecerPrincipal
+);
+
+
+// ============================================================
+// ELIMINAR IMAGEN
+// ============================================================
+
+router.delete(
+  '/:id/imagenes/:imagenId',
+  localImagenController.eliminar
+);
+
+
+// ============================================================
+// DISPONIBILIDAD
+// ============================================================
+
+router.patch(
+  '/:id/disponibilidad',
+  localComercialController
+      .cambiarDisponibilidad
 );
 
 
@@ -77,18 +130,7 @@ router.patch(
 
 
 // ============================================================
-// DISPONIBILIDAD
-// ============================================================
-
-router.patch(
-  '/:id/disponibilidad',
-  localComercialController
-      .cambiarDisponibilidad
-);
-
-
-// ============================================================
-// ELIMINAR
+// ELIMINAR LOCAL
 // ============================================================
 
 router.delete(
