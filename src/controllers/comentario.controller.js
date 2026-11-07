@@ -39,7 +39,26 @@ const listarComentarios = async (req, res) => {
       INNER JOIN roles r
         ON r.id = u.rol_id
 
+      INNER JOIN publicaciones p
+        ON p.id = c.publicacion_id
+
+      LEFT JOIN comentarios padre
+        ON padre.id = c.comentario_padre_id
+
       WHERE c.publicacion_id = $1
+
+        -- Solo comentarios visibles
+        AND c.activo = TRUE
+
+        -- La publicación también debe estar visible
+        AND p.activo = TRUE
+
+        -- Si es respuesta, su comentario padre
+        -- también debe seguir visible
+        AND (
+          c.comentario_padre_id IS NULL
+          OR padre.activo = TRUE
+        )
 
       ORDER BY c.fecha_creacion ASC
       `,
@@ -60,7 +79,8 @@ const listarComentarios = async (req, res) => {
     );
 
     return res.status(500).json({
-      message: 'Error interno del servidor',
+      message:
+        'Error interno del servidor',
     });
   }
 };
@@ -76,35 +96,51 @@ const crearComentario = async (req, res) => {
     const usuarioId = req.usuario.id;
     const { texto } = req.body;
 
-    // Validar texto
+    // =================================================
+    // VALIDAR TEXTO
+    // =================================================
+
     if (
       !texto ||
       typeof texto !== 'string' ||
       texto.trim() === ''
     ) {
       return res.status(400).json({
-        message: 'Escribe un comentario',
+        message:
+          'Escribe un comentario',
       });
     }
 
-    // Verificar que la publicación exista
+    // =================================================
+    // VERIFICAR PUBLICACIÓN
+    // =================================================
+    // No se permite comentar una publicación
+    // que haya sido ocultada por moderación.
+
     const publicacion = await pool.query(
       `
       SELECT id
       FROM publicaciones
       WHERE id = $1
+        AND activo = TRUE
       LIMIT 1
       `,
-      [id]
+      [
+        id,
+      ]
     );
 
     if (publicacion.rows.length === 0) {
       return res.status(404).json({
-        message: 'Publicación no encontrada',
+        message:
+          'Publicación no encontrada o no disponible',
       });
     }
 
-    // Crear comentario principal
+    // =================================================
+    // CREAR COMENTARIO
+    // =================================================
+
     const resultado = await pool.query(
       `
       INSERT INTO comentarios
@@ -123,7 +159,8 @@ const crearComentario = async (req, res) => {
         usuario_id,
         texto,
         comentario_padre_id,
-        fecha_creacion
+        fecha_creacion,
+        activo
       `,
       [
         id,
@@ -135,8 +172,10 @@ const crearComentario = async (req, res) => {
     const comentarioCreado =
         resultado.rows[0];
 
-    // Obtener datos del usuario para devolver
-    // el comentario completo a Flutter
+    // =================================================
+    // OBTENER COMENTARIO COMPLETO
+    // =================================================
+
     const comentarioCompleto =
         await pool.query(
       `
@@ -147,6 +186,7 @@ const crearComentario = async (req, res) => {
         c.texto,
         c.comentario_padre_id,
         c.fecha_creacion,
+        c.activo,
 
         u.nombre AS usuario_nombre,
         u.foto_perfil_url AS usuario_imagen,
@@ -164,6 +204,9 @@ const crearComentario = async (req, res) => {
         ON r.id = u.rol_id
 
       WHERE c.id = $1
+        AND c.activo = TRUE
+
+      LIMIT 1
       `,
       [
         comentarioCreado.id,
@@ -171,7 +214,9 @@ const crearComentario = async (req, res) => {
     );
 
     return res.status(201).json({
-      message: 'Comentario publicado correctamente',
+      message:
+        'Comentario publicado correctamente',
+
       comentario:
           comentarioCompleto.rows[0],
     });
@@ -183,7 +228,8 @@ const crearComentario = async (req, res) => {
     );
 
     return res.status(500).json({
-      message: 'Error interno del servidor',
+      message:
+        'Error interno del servidor',
     });
   }
 };
@@ -269,6 +315,10 @@ const responderComentario = async (
       texto,
     } = req.body;
 
+    // =================================================
+    // VALIDAR TEXTO
+    // =================================================
+
     if (
       !texto ||
       typeof texto !== 'string' ||
@@ -280,9 +330,15 @@ const responderComentario = async (
       });
     }
 
-    // Verificar que el comentario exista
-    // y que la publicación pertenezca
-    // al emprendimiento del usuario.
+    // =================================================
+    // VERIFICAR COMENTARIO Y PUBLICACIÓN
+    // =================================================
+    // Solo puede responder el propietario del
+    // emprendimiento.
+    //
+    // El comentario y la publicación deben seguir
+    // activos.
+
     const comentario =
         await pool.query(
       `
@@ -300,7 +356,14 @@ const responderComentario = async (
         ON e.id = p.emprendimiento_id
 
       WHERE c.id = $1
+
         AND e.usuario_id = $2
+
+        AND c.activo = TRUE
+
+        AND p.activo = TRUE
+
+      LIMIT 1
       `,
       [
         comentarioId,
@@ -313,13 +376,17 @@ const responderComentario = async (
     ) {
       return res.status(403).json({
         message:
-          'No puedes responder este comentario',
+          'No puedes responder este comentario o el contenido ya no está disponible',
       });
     }
 
     const publicacionId =
         comentario.rows[0]
-          .publicacion_id;
+            .publicacion_id;
+
+    // =================================================
+    // CREAR RESPUESTA
+    // =================================================
 
     const resultado =
         await pool.query(
@@ -340,7 +407,8 @@ const responderComentario = async (
         usuario_id,
         texto,
         comentario_padre_id,
-        fecha_creacion
+        fecha_creacion,
+        activo
       `,
       [
         publicacionId,
@@ -353,8 +421,10 @@ const responderComentario = async (
     const respuestaCreada =
         resultado.rows[0];
 
-    // Obtener respuesta completa
-    // incluyendo usuario, foto y rol
+    // =================================================
+    // OBTENER RESPUESTA COMPLETA
+    // =================================================
+
     const respuestaCompleta =
         await pool.query(
       `
@@ -365,6 +435,7 @@ const responderComentario = async (
         c.texto,
         c.comentario_padre_id,
         c.fecha_creacion,
+        c.activo,
 
         u.nombre AS usuario_nombre,
         u.foto_perfil_url AS usuario_imagen,
@@ -382,6 +453,9 @@ const responderComentario = async (
         ON r.id = u.rol_id
 
       WHERE c.id = $1
+        AND c.activo = TRUE
+
+      LIMIT 1
       `,
       [
         respuestaCreada.id,
