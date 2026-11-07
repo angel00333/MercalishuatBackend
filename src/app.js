@@ -42,6 +42,11 @@ const reporteRoutes =
     './routes/reporte.routes'
   );
 
+const localComercialRoutes =
+  require(
+    './routes/local_comercial.routes'
+  );
+
 
 // =======================================
 // MIDDLEWARES
@@ -74,7 +79,7 @@ app.get(
         'online',
 
       version:
-        'Beta 6.2',
+        'Beta 6.3',
     });
   }
 );
@@ -92,6 +97,11 @@ app.use(
 app.use(
   '/api/reportes',
   reporteRoutes
+);
+
+app.use(
+  '/api/locales',
+  localComercialRoutes
 );
 
 app.use(
