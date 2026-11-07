@@ -1,82 +1,92 @@
-const express =
-  require('express');
+const express = require('express');
 
-const authMiddleware =
-  require(
-    '../middleware/auth.middleware'
-  );
+const authMiddleware = require('../middleware/auth.middleware');
+
+// USA AQUÍ EL MISMO MIDDLEWARE QUE YA TIENES
+const {
+  permitirRoles,
+} = require('../middleware/rol.middleware');
 
 const localComercialController =
-  require(
-    '../controllers/local_comercial.controller'
-  );
+  require('../controllers/local_comercial.controller');
 
 const localImagenController =
-  require(
-    '../controllers/local_comercial_imagen.controller'
-  );
+  require('../controllers/local_comercial_imagen.controller');
 
 const {
   subirImagenesLocal,
-} = require(
-  '../middleware/local_imagen.middleware'
-);
+} = require('../middleware/local_imagen.middleware');
 
-
-const router =
-  express.Router();
-
+const router = express.Router();
 
 // ============================================================
-// AUTENTICACIÓN
+// TODAS LAS RUTAS REQUIEREN AUTENTICACIÓN
 // ============================================================
 
-router.use(
-  authMiddleware.verificarToken
-);
-
+router.use(authMiddleware.verificarToken);
 
 // ============================================================
-// LISTAR
+// CATÁLOGO DE LOCALES
+//
+// Usuario y Emprendedor pueden consultar.
+// No se aplica permitirRoles porque ambos pueden entrar.
 // ============================================================
 
 router.get(
   '/',
-  localComercialController.listar
+  localComercialController.listar,
 );
-
 
 // ============================================================
 // MIS LOCALES
+//
+// Exclusivo para Emprendedor.
+//
+// IMPORTANTE:
+// Esta ruta debe ir ANTES de /:id.
 // ============================================================
 
 router.get(
   '/mios',
-  localComercialController.listarMios
+  permitirRoles('emprendedor'),
+  localComercialController.listarMios,
 );
 
+// ============================================================
+// CREAR LOCAL
+//
+// Exclusivo para Emprendedor.
+// ============================================================
+
+router.post(
+  '/',
+  permitirRoles('emprendedor'),
+  localComercialController.crear,
+);
 
 // ============================================================
 // SUBIR IMÁGENES
+//
+// Exclusivo para Emprendedor.
+// El controlador también valida que el local le pertenezca.
 // ============================================================
 
 router.post(
   '/:id/imagenes',
+  permitirRoles('emprendedor'),
   subirImagenesLocal,
-  localImagenController.subir
+  localImagenController.subir,
 );
 
-
 // ============================================================
-// ESTABLECER PRINCIPAL
+// ESTABLECER IMAGEN PRINCIPAL
 // ============================================================
 
 router.patch(
   '/:id/imagenes/:imagenId/principal',
-  localImagenController
-      .establecerPrincipal
+  permitirRoles('emprendedor'),
+  localImagenController.establecerPrincipal,
 );
-
 
 // ============================================================
 // ELIMINAR IMAGEN
@@ -84,50 +94,29 @@ router.patch(
 
 router.delete(
   '/:id/imagenes/:imagenId',
-  localImagenController.eliminar
+  permitirRoles('emprendedor'),
+  localImagenController.eliminar,
 );
 
-
 // ============================================================
-// DISPONIBILIDAD
+// CAMBIAR DISPONIBILIDAD
 // ============================================================
 
 router.patch(
   '/:id/disponibilidad',
-  localComercialController
-      .cambiarDisponibilidad
+  permitirRoles('emprendedor'),
+  localComercialController.cambiarDisponibilidad,
 );
 
-
 // ============================================================
-// DETALLE
-// ============================================================
-
-router.get(
-  '/:id',
-  localComercialController.obtener
-);
-
-
-// ============================================================
-// CREAR
-// ============================================================
-
-router.post(
-  '/',
-  localComercialController.crear
-);
-
-
-// ============================================================
-// ACTUALIZAR
+// ACTUALIZAR LOCAL
 // ============================================================
 
 router.patch(
   '/:id',
-  localComercialController.actualizar
+  permitirRoles('emprendedor'),
+  localComercialController.actualizar,
 );
-
 
 // ============================================================
 // ELIMINAR LOCAL
@@ -135,9 +124,20 @@ router.patch(
 
 router.delete(
   '/:id',
-  localComercialController.eliminar
+  permitirRoles('emprendedor'),
+  localComercialController.eliminar,
 );
 
+// ============================================================
+// VER DETALLE
+//
+// Usuario y Emprendedor.
+// Debe ir después de /mios.
+// ============================================================
 
-module.exports =
-  router;
+router.get(
+  '/:id',
+  localComercialController.obtener,
+);
+
+module.exports = router;
