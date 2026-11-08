@@ -1,292 +1,3 @@
-const pool = require('../config/db');
-
-const {
-  crearNotificacion,
-} = require(
-  '../services/notificacion.service'
-);
-
-
-// ============================================================
-// UTILIDAD
-// ============================================================
-
-function obtenerUsuarioId(req) {
-  return (
-    req.usuario?.id ||
-    req.user?.id ||
-    null
-  );
-}
-
-
-// ============================================================
-// CREAR O BUSCAR CONVERSACIÓN
-//
-// POST /api/chat/conversacion
-//
-// body:
-// {
-//   "usuario_destino_id": 5
-// }
-// ============================================================
-
-exports.crearConversacion =
-  async (req, res) => {
-    const client =
-      await pool.connect();
-
-    try {
-      const usuarioId =
-        obtenerUsuarioId(req);
-
-      const {
-        usuario_destino_id,
-      } = req.body;
-
-      // ======================================================
-      // VALIDAR USUARIO
-      // ======================================================
-
-      if (!usuarioId) {
-        return res
-          .status(401)
-          .json({
-            success: false,
-            message:
-              'Usuario no autenticado',
-          });
-      }
-
-      // ======================================================
-      // VALIDAR DESTINATARIO
-      // ======================================================
-
-      if (!usuario_destino_id) {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message:
-              'Falta usuario_destino_id',
-          });
-      }
-
-      const destinoId =
-        Number(
-          usuario_destino_id
-        );
-
-      if (
-        !Number.isInteger(
-          destinoId
-        )
-      ) {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message:
-              'ID de usuario destinatario inválido',
-          });
-      }
-
-      // ======================================================
-      // EVITAR CHAT CONSIGO MISMO
-      // ======================================================
-
-      if (
-        Number(usuarioId) ===
-        destinoId
-      ) {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message:
-              'No puedes iniciar una conversación contigo mismo',
-          });
-      }
-
-      // ======================================================
-      // VERIFICAR QUE EL DESTINATARIO EXISTA
-      // ======================================================
-
-      const usuarioExiste =
-        await client.query(
-          `
-          SELECT
-            id
-
-          FROM usuarios
-
-          WHERE id = $1
-
-          LIMIT 1
-          `,
-          [
-            destinoId,
-          ]
-        );
-
-      if (
-        usuarioExiste.rowCount === 0
-      ) {
-        return res
-          .status(404)
-          .json({
-            success: false,
-            message:
-              'El usuario destinatario no existe',
-          });
-      }
-
-      // ======================================================
-      // BUSCAR CONVERSACIÓN EXISTENTE
-      // ======================================================
-
-      const conversacionExistente =
-        await client.query(
-          `
-          SELECT
-            c.id
-
-          FROM conversaciones c
-
-          JOIN participantes_conversacion p1
-            ON p1.conversacion_id = c.id
-            AND p1.usuario_id = $1
-
-          JOIN participantes_conversacion p2
-            ON p2.conversacion_id = c.id
-            AND p2.usuario_id = $2
-
-          WHERE (
-            SELECT COUNT(*)
-
-            FROM participantes_conversacion pc
-
-            WHERE
-              pc.conversacion_id = c.id
-          ) = 2
-
-          LIMIT 1
-          `,
-          [
-            usuarioId,
-            destinoId,
-          ]
-        );
-
-      if (
-        conversacionExistente
-          .rowCount > 0
-      ) {
-        return res
-          .status(200)
-          .json({
-            success: true,
-            creada: false,
-            conversacion_id:
-              conversacionExistente
-                .rows[0]
-                .id,
-          });
-      }
-
-      // ======================================================
-      // CREAR CONVERSACIÓN
-      // ======================================================
-
-      await client.query(
-        'BEGIN'
-      );
-
-      const nuevaConversacion =
-        await client.query(
-          `
-          INSERT INTO conversaciones (
-            created_at,
-            updated_at
-          )
-
-          VALUES (
-            NOW(),
-            NOW()
-          )
-
-          RETURNING id
-          `
-        );
-
-      const conversacionId =
-        nuevaConversacion
-          .rows[0]
-          .id;
-
-      // ======================================================
-      // AGREGAR LOS DOS PARTICIPANTES
-      // ======================================================
-
-      await client.query(
-        `
-        INSERT INTO participantes_conversacion (
-          conversacion_id,
-          usuario_id
-        )
-
-        VALUES
-          ($1, $2),
-          ($1, $3)
-        `,
-        [
-          conversacionId,
-          usuarioId,
-          destinoId,
-        ]
-      );
-
-      await client.query(
-        'COMMIT'
-      );
-
-      return res
-        .status(201)
-        .json({
-          success: true,
-          creada: true,
-          conversacion_id:
-            conversacionId,
-        });
-
-    } catch (error) {
-      try {
-        await client.query(
-          'ROLLBACK'
-        );
-      } catch (_) {}
-
-      console.error(
-        'ERROR CREANDO CONVERSACIÓN:',
-        error
-      );
-
-      return res
-        .status(500)
-        .json({
-          success: false,
-          message:
-            'No se pudo crear la conversación',
-          error:
-            error.message,
-        });
-
-    } finally {
-      client.release();
-    }
-  };
-
-
 // ============================================================
 // LISTAR CONVERSACIONES
 //
@@ -294,16 +5,22 @@ exports.crearConversacion =
 // ============================================================
 
 exports.listarConversaciones =
-  async (req, res) => {
+  async (
+    req,
+    res
+  ) => {
     try {
       const usuarioId =
-        obtenerUsuarioId(req);
+        obtenerUsuarioId(
+          req
+        );
 
       if (!usuarioId) {
         return res
           .status(401)
           .json({
             success: false,
+
             message:
               'Usuario no autenticado',
           });
@@ -317,6 +34,10 @@ exports.listarConversaciones =
             c.created_at,
             c.updated_at,
 
+            -- =================================================
+            -- OTRO USUARIO / PROPIETARIO
+            -- =================================================
+
             otro.usuario_id
               AS otro_usuario_id,
 
@@ -328,6 +49,23 @@ exports.listarConversaciones =
 
             u.foto_perfil_url
               AS imagen_usuario_url,
+
+            -- =================================================
+            -- EMPRENDIMIENTO DEL OTRO USUARIO
+            -- =================================================
+
+            e.id
+              AS emprendimiento_id,
+
+            e.nombre
+              AS emprendimiento_nombre,
+
+            e.imagen_url
+              AS emprendimiento_imagen_url,
+
+            -- =================================================
+            -- ÚLTIMO MENSAJE
+            -- =================================================
 
             (
               SELECT
@@ -347,6 +85,10 @@ exports.listarConversaciones =
             )
               AS ultimo_mensaje,
 
+            -- =================================================
+            -- FECHA ÚLTIMO MENSAJE
+            -- =================================================
+
             (
               SELECT
                 m.created_at
@@ -364,6 +106,10 @@ exports.listarConversaciones =
               LIMIT 1
             )
               AS ultimo_mensaje_fecha,
+
+            -- =================================================
+            -- NO LEÍDOS
+            -- =================================================
 
             (
               SELECT
@@ -387,12 +133,20 @@ exports.listarConversaciones =
 
           FROM conversaciones c
 
+          -- ===================================================
+          // YO
+          -- ===================================================
+
           JOIN participantes_conversacion yo
             ON yo.conversacion_id =
               c.id
 
             AND yo.usuario_id =
               $1
+
+          -- ===================================================
+          -- OTRO PARTICIPANTE
+          -- ===================================================
 
           JOIN participantes_conversacion otro
             ON otro.conversacion_id =
@@ -404,6 +158,21 @@ exports.listarConversaciones =
           JOIN usuarios u
             ON u.id =
               otro.usuario_id
+
+          -- ===================================================
+          -- TIENDA DEL OTRO USUARIO
+          -- ===================================================
+
+          LEFT JOIN emprendimientos e
+            ON e.usuario_id =
+              otro.usuario_id
+
+            AND e.activo =
+              TRUE
+
+          -- ===================================================
+          -- ORDEN
+          -- ===================================================
 
           ORDER BY
             COALESCE(
@@ -419,6 +188,7 @@ exports.listarConversaciones =
                   m.conversacion_id =
                     c.id
               ),
+
               c.updated_at
             ) DESC
           `,
@@ -429,11 +199,13 @@ exports.listarConversaciones =
 
       return res.json({
         success: true,
+
         conversaciones:
           resultado.rows,
       });
-
-    } catch (error) {
+    } catch (
+      error
+    ) {
       console.error(
         'ERROR LISTANDO CONVERSACIONES:',
         error
@@ -443,876 +215,10 @@ exports.listarConversaciones =
         .status(500)
         .json({
           success: false,
+
           message:
             'No se pudieron cargar las conversaciones',
-          error:
-            error.message,
-        });
-    }
-  };
 
-
-// ============================================================
-// OBTENER MENSAJES
-//
-// GET /api/chat/conversacion/:id/mensajes
-// ============================================================
-
-exports.obtenerMensajes =
-  async (req, res) => {
-    try {
-      const usuarioId =
-        obtenerUsuarioId(req);
-
-      const conversacionId =
-        Number(
-          req.params.id
-        );
-
-      // ======================================================
-      // VALIDAR USUARIO
-      // ======================================================
-
-      if (!usuarioId) {
-        return res
-          .status(401)
-          .json({
-            success: false,
-            message:
-              'Usuario no autenticado',
-          });
-      }
-
-      // ======================================================
-      // VALIDAR CONVERSACIÓN
-      // ======================================================
-
-      if (
-        !Number.isInteger(
-          conversacionId
-        )
-      ) {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message:
-              'ID de conversación inválido',
-          });
-      }
-
-      // ======================================================
-      // VERIFICAR PARTICIPANTE
-      // ======================================================
-
-      const pertenece =
-        await pool.query(
-          `
-          SELECT
-            id
-
-          FROM participantes_conversacion
-
-          WHERE
-            conversacion_id = $1
-            AND usuario_id = $2
-
-          LIMIT 1
-          `,
-          [
-            conversacionId,
-            usuarioId,
-          ]
-        );
-
-      if (
-        pertenece.rowCount === 0
-      ) {
-        return res
-          .status(403)
-          .json({
-            success: false,
-            message:
-              'No tienes acceso a esta conversación',
-          });
-      }
-
-      // ======================================================
-      // OBTENER MENSAJES
-      // ======================================================
-
-      const resultado =
-        await pool.query(
-          `
-          SELECT
-            m.id,
-            m.conversacion_id,
-            m.remitente_id,
-            m.contenido,
-            m.leido,
-            m.created_at,
-
-            CASE
-              WHEN
-                m.remitente_id =
-                  $2
-              THEN TRUE
-              ELSE FALSE
-            END
-              AS es_mio
-
-          FROM mensajes m
-
-          WHERE
-            m.conversacion_id =
-              $1
-
-          ORDER BY
-            m.created_at ASC,
-            m.id ASC
-          `,
-          [
-            conversacionId,
-            usuarioId,
-          ]
-        );
-
-      return res.json({
-        success: true,
-        mensajes:
-          resultado.rows,
-      });
-
-    } catch (error) {
-      console.error(
-        'ERROR OBTENIENDO MENSAJES:',
-        error
-      );
-
-      return res
-        .status(500)
-        .json({
-          success: false,
-          message:
-            'No se pudieron cargar los mensajes',
-          error:
-            error.message,
-        });
-    }
-  };
-
-
-// ============================================================
-// ENVIAR MENSAJE
-//
-// POST /api/chat/conversacion/:id/mensaje
-// ============================================================
-
-exports.enviarMensaje =
-  async (req, res) => {
-    const client =
-      await pool.connect();
-
-    try {
-      const usuarioId =
-        obtenerUsuarioId(req);
-
-      const conversacionId =
-        Number(
-          req.params.id
-        );
-
-      const contenido =
-        req.body.contenido
-          ?.toString()
-          .trim();
-
-      // ======================================================
-      // VALIDAR USUARIO
-      // ======================================================
-
-      if (!usuarioId) {
-        return res
-          .status(401)
-          .json({
-            success: false,
-            message:
-              'Usuario no autenticado',
-          });
-      }
-
-      // ======================================================
-      // VALIDAR CONVERSACIÓN
-      // ======================================================
-
-      if (
-        !Number.isInteger(
-          conversacionId
-        )
-      ) {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message:
-              'Conversación inválida',
-          });
-      }
-
-      // ======================================================
-      // VALIDAR MENSAJE
-      // ======================================================
-
-      if (!contenido) {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message:
-              'El mensaje no puede estar vacío',
-          });
-      }
-
-      if (
-        contenido.length > 5000
-      ) {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message:
-              'El mensaje es demasiado largo',
-          });
-      }
-
-      // ======================================================
-      // VERIFICAR PARTICIPANTE
-      // ======================================================
-
-      const pertenece =
-        await client.query(
-          `
-          SELECT
-            id
-
-          FROM participantes_conversacion
-
-          WHERE
-            conversacion_id = $1
-            AND usuario_id = $2
-
-          LIMIT 1
-          `,
-          [
-            conversacionId,
-            usuarioId,
-          ]
-        );
-
-      if (
-        pertenece.rowCount === 0
-      ) {
-        return res
-          .status(403)
-          .json({
-            success: false,
-            message:
-              'No tienes acceso a esta conversación',
-          });
-      }
-
-      // ======================================================
-      // OBTENER DESTINATARIO
-      // ======================================================
-
-      const destinatarioResultado =
-        await client.query(
-          `
-          SELECT
-            usuario_id
-
-          FROM participantes_conversacion
-
-          WHERE
-            conversacion_id = $1
-            AND usuario_id <> $2
-
-          LIMIT 1
-          `,
-          [
-            conversacionId,
-            usuarioId,
-          ]
-        );
-
-      if (
-        destinatarioResultado
-          .rowCount === 0
-      ) {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message:
-              'No se encontró el destinatario',
-          });
-      }
-
-      const destinatarioId =
-        Number(
-          destinatarioResultado
-            .rows[0]
-            .usuario_id
-        );
-
-      // ======================================================
-      // DATOS DEL REMITENTE
-      //
-      // Se usan para mostrar el nombre real en la notificación.
-      // ======================================================
-
-      const remitenteResultado =
-        await client.query(
-          `
-          SELECT
-            id,
-            nombre,
-            foto_perfil_url
-
-          FROM usuarios
-
-          WHERE id = $1
-
-          LIMIT 1
-          `,
-          [
-            usuarioId,
-          ]
-        );
-
-      const remitente =
-        remitenteResultado
-          .rows[0];
-
-      const nombreRemitente =
-        remitente?.nombre
-          ?.toString()
-          .trim();
-
-      // IMPORTANTE:
-      // En JavaScript no existe .isNotEmpty.
-      const tituloNotificacion =
-        nombreRemitente &&
-        nombreRemitente.length > 0
-          ? nombreRemitente
-          : 'Usuario';
-
-      // ======================================================
-      // TRANSACCIÓN
-      // ======================================================
-
-      await client.query(
-        'BEGIN'
-      );
-
-      // ======================================================
-      // GUARDAR MENSAJE
-      // ======================================================
-
-      const resultado =
-        await client.query(
-          `
-          INSERT INTO mensajes (
-            conversacion_id,
-            remitente_id,
-            contenido,
-            leido,
-            created_at
-          )
-
-          VALUES (
-            $1,
-            $2,
-            $3,
-            FALSE,
-            NOW()
-          )
-
-          RETURNING
-            id,
-            conversacion_id,
-            remitente_id,
-            contenido,
-            leido,
-            created_at
-          `,
-          [
-            conversacionId,
-            usuarioId,
-            contenido,
-          ]
-        );
-
-      // ======================================================
-      // ACTUALIZAR FECHA DE CONVERSACIÓN
-      // ======================================================
-
-      await client.query(
-        `
-        UPDATE conversaciones
-
-        SET
-          updated_at =
-            NOW()
-
-        WHERE id =
-          $1
-        `,
-        [
-          conversacionId,
-        ]
-      );
-
-      await client.query(
-        'COMMIT'
-      );
-
-      // ======================================================
-      // MENSAJE RESULTANTE
-      // ======================================================
-
-      const mensaje =
-        resultado.rows[0];
-
-      mensaje.es_mio =
-        true;
-
-      // ======================================================
-      // SOCKET.IO
-      // ======================================================
-
-      const io =
-        req.app.get(
-          'io'
-        );
-
-      if (io) {
-        // ====================================================
-        // ENVIAR MENSAJE AL DESTINATARIO
-        // ====================================================
-
-        io.to(
-          `usuario:${destinatarioId}`
-        ).emit(
-          'nuevo_mensaje',
-          {
-            id:
-              mensaje.id,
-
-            conversacion_id:
-              mensaje.conversacion_id,
-
-            remitente_id:
-              mensaje.remitente_id,
-
-            contenido:
-              mensaje.contenido,
-
-            leido:
-              mensaje.leido,
-
-            created_at:
-              mensaje.created_at,
-
-            es_mio:
-              false,
-          }
-        );
-
-        // ====================================================
-        // ACTUALIZAR LISTA DEL DESTINATARIO
-        // ====================================================
-
-        io.to(
-          `usuario:${destinatarioId}`
-        ).emit(
-          'conversacion_actualizada',
-          {
-            conversacion_id:
-              conversacionId,
-          }
-        );
-
-        // ====================================================
-        // ACTUALIZAR LISTA DEL REMITENTE
-        // ====================================================
-
-        io.to(
-          `usuario:${usuarioId}`
-        ).emit(
-          'conversacion_actualizada',
-          {
-            conversacion_id:
-              conversacionId,
-          }
-        );
-      }
-
-      // ======================================================
-      // CREAR NOTIFICACIÓN INTERNA
-      //
-      // Si falla la notificación, el mensaje ya enviado
-      // NO debe fallar.
-      // ======================================================
-
-      try {
-        await crearNotificacion({
-          usuarioId:
-            destinatarioId,
-
-          tipo:
-            'mensaje',
-
-          titulo:
-            tituloNotificacion,
-
-          mensaje:
-            contenido,
-
-          referenciaId:
-            conversacionId,
-
-          referenciaTipo:
-            'conversacion',
-
-          io:
-            io,
-        });
-
-      } catch (
-        errorNotificacion
-      ) {
-        console.error(
-          'ERROR CREANDO NOTIFICACIÓN DE MENSAJE:',
-          errorNotificacion
-        );
-      }
-
-      // ======================================================
-      // RESPUESTA
-      // ======================================================
-
-      return res
-        .status(201)
-        .json({
-          success: true,
-          mensaje,
-        });
-
-    } catch (error) {
-      try {
-        await client.query(
-          'ROLLBACK'
-        );
-      } catch (_) {}
-
-      console.error(
-        'ERROR ENVIANDO MENSAJE:',
-        error
-      );
-
-      return res
-        .status(500)
-        .json({
-          success: false,
-          message:
-            'No se pudo enviar el mensaje',
-          error:
-            error.message,
-        });
-
-    } finally {
-      client.release();
-    }
-  };
-
-
-// ============================================================
-// MARCAR COMO LEÍDOS
-//
-// PUT /api/chat/conversacion/:id/leidos
-// ============================================================
-
-exports.marcarComoLeidos =
-  async (req, res) => {
-    try {
-      const usuarioId =
-        obtenerUsuarioId(req);
-
-      const conversacionId =
-        Number(
-          req.params.id
-        );
-
-      // ======================================================
-      // VALIDAR USUARIO
-      // ======================================================
-
-      if (!usuarioId) {
-        return res
-          .status(401)
-          .json({
-            success: false,
-            message:
-              'Usuario no autenticado',
-          });
-      }
-
-      // ======================================================
-      // VALIDAR CONVERSACIÓN
-      // ======================================================
-
-      if (
-        !Number.isInteger(
-          conversacionId
-        )
-      ) {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message:
-              'Conversación inválida',
-          });
-      }
-
-      // ======================================================
-      // VERIFICAR PARTICIPANTE
-      // ======================================================
-
-      const pertenece =
-        await pool.query(
-          `
-          SELECT
-            id
-
-          FROM participantes_conversacion
-
-          WHERE
-            conversacion_id = $1
-            AND usuario_id = $2
-
-          LIMIT 1
-          `,
-          [
-            conversacionId,
-            usuarioId,
-          ]
-        );
-
-      if (
-        pertenece.rowCount === 0
-      ) {
-        return res
-          .status(403)
-          .json({
-            success: false,
-            message:
-              'No tienes acceso a esta conversación',
-          });
-      }
-
-      // ======================================================
-      // MARCAR MENSAJES COMO LEÍDOS
-      // ======================================================
-
-      const resultado =
-        await pool.query(
-          `
-          UPDATE mensajes
-
-          SET
-            leido =
-              TRUE
-
-          WHERE
-            conversacion_id =
-              $1
-
-            AND
-              remitente_id <>
-                $2
-
-            AND
-              leido =
-                FALSE
-
-          RETURNING
-            id,
-            remitente_id
-          `,
-          [
-            conversacionId,
-            usuarioId,
-          ]
-        );
-
-      // ======================================================
-      // MARCAR NOTIFICACIONES DE ESTA CONVERSACIÓN COMO LEÍDAS
-      // ======================================================
-
-      await pool.query(
-        `
-        UPDATE notificaciones
-
-        SET
-          leida =
-            TRUE
-
-        WHERE
-          usuario_id =
-            $1
-
-          AND
-            tipo =
-              'mensaje'
-
-          AND
-            referencia_tipo =
-              'conversacion'
-
-          AND
-            referencia_id =
-              $2
-
-          AND
-            leida =
-              FALSE
-        `,
-        [
-          usuarioId,
-          conversacionId,
-        ]
-      );
-
-      // ======================================================
-      // SOCKET.IO
-      // ======================================================
-
-      const io =
-        req.app.get(
-          'io'
-        );
-
-      if (
-        io &&
-        resultado.rowCount > 0
-      ) {
-        // ====================================================
-        // AGRUPAR REMITENTES
-        // ====================================================
-
-        const remitentes = [
-          ...new Set(
-            resultado.rows.map(
-              (fila) =>
-                Number(
-                  fila.remitente_id
-                )
-            )
-          ),
-        ];
-
-        // ====================================================
-        // AVISAR AL REMITENTE QUE SUS MENSAJES FUERON LEÍDOS
-        // ====================================================
-
-        for (
-          const remitenteId
-          of remitentes
-        ) {
-          io.to(
-            `usuario:${remitenteId}`
-          ).emit(
-            'mensajes_leidos',
-            {
-              conversacion_id:
-                conversacionId,
-
-              lector_id:
-                Number(
-                  usuarioId
-                ),
-            }
-          );
-
-          io.to(
-            `usuario:${remitenteId}`
-          ).emit(
-            'conversacion_actualizada',
-            {
-              conversacion_id:
-                conversacionId,
-            }
-          );
-        }
-
-        // ====================================================
-        // ACTUALIZAR LISTA DEL LECTOR
-        // ====================================================
-
-        io.to(
-          `usuario:${usuarioId}`
-        ).emit(
-          'conversacion_actualizada',
-          {
-            conversacion_id:
-              conversacionId,
-          }
-        );
-      }
-
-      // ======================================================
-      // ACTUALIZAR CAMPANA / NOTIFICACIONES DEL LECTOR
-      // ======================================================
-
-      if (io) {
-        io.to(
-          `usuario:${usuarioId}`
-        ).emit(
-          'notificaciones_actualizadas',
-          {
-            referencia_tipo:
-              'conversacion',
-
-            referencia_id:
-              conversacionId,
-          }
-        );
-      }
-
-      // ======================================================
-      // RESPUESTA
-      // ======================================================
-
-      return res.json({
-        success: true,
-        actualizados:
-          resultado.rowCount,
-      });
-
-    } catch (error) {
-      console.error(
-        'ERROR MARCANDO LEÍDOS:',
-        error
-      );
-
-      return res
-        .status(500)
-        .json({
-          success: false,
-          message:
-            'No se pudieron actualizar los mensajes',
           error:
             error.message,
         });
