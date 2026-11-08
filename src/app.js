@@ -47,6 +47,11 @@ const localComercialRoutes =
     './routes/local_comercial.routes'
   );
 
+const adminLocalComercialRoutes =
+  require(
+    './routes/admin_local_comercial.routes',
+  );
+
 
 // =======================================
 // MIDDLEWARES
@@ -92,6 +97,11 @@ app.get(
 app.use(
   '/api/admin',
   adminRoutes
+);
+
+app.use(
+  '/api/admin/locales',
+  adminLocalComercialRoutes,
 );
 
 app.use(
