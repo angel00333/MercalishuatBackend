@@ -1,5 +1,11 @@
 const pool = require('../config/db');
 
+const {
+  crearNotificacionesParaTodos,
+} = require(
+  '../services/notificacion.service'
+);
+
 
 // ============================================
 // VALIDAR COORDENADAS
@@ -213,12 +219,57 @@ const crearEmprendimiento = async (
         ]
       );
 
+    const nuevoEmprendimiento =
+      resultado.rows[0];
+
+    // ==========================================
+    // NOTIFICAR NUEVO EMPRENDIMIENTO
+    //
+    // La creación del emprendimiento no falla
+    // si alguna notificación presenta un error.
+    // ==========================================
+
+    try {
+      const io =
+        req.app?.get?.('io') ||
+        null;
+
+      await crearNotificacionesParaTodos({
+        excluirUsuarioId:
+          usuarioId,
+
+        tipo:
+          'nuevo_emprendimiento',
+
+        titulo:
+          '¡Nuevo emprendimiento! 🏪',
+
+        mensaje:
+          `${nuevoEmprendimiento.nombre} se unió a Mercalishuat.`,
+
+        referenciaId:
+          nuevoEmprendimiento.id,
+
+        referenciaTipo:
+          'emprendimiento',
+
+        io,
+      });
+    } catch (
+      errorNotificacion
+    ) {
+      console.error(
+        'ERROR NOTIFICANDO NUEVO EMPRENDIMIENTO:',
+        errorNotificacion
+      );
+    }
+
     return res.status(201).json({
       message:
         'Emprendimiento creado correctamente',
 
       emprendimiento:
-        resultado.rows[0],
+        nuevoEmprendimiento,
     });
   } catch (error) {
     console.error(

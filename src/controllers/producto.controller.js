@@ -1,5 +1,11 @@
 const pool = require('../config/db');
 
+const {
+  crearNotificacionesParaTodos,
+} = require(
+  '../services/notificacion.service'
+);
+
 
 // ============================================
 // OBTENER TIENDA DEL EMPRENDEDOR
@@ -8,7 +14,9 @@ const pool = require('../config/db');
 const obtenerEmprendimientoDelUsuario = async (usuarioId) => {
   const resultado = await pool.query(
     `
-    SELECT id
+    SELECT
+      id,
+      nombre
     FROM emprendimientos
     WHERE usuario_id = $1
       AND activo = TRUE
@@ -116,9 +124,54 @@ const crearProducto = async (req, res) => {
       ]
     );
 
+    const nuevoProducto =
+      resultado.rows[0];
+
+    // ==========================================
+    // NOTIFICAR NUEVO PRODUCTO
+    // ==========================================
+
+    try {
+      const io =
+        req.app?.get?.('io') ||
+        null;
+
+      await crearNotificacionesParaTodos({
+        excluirUsuarioId:
+          usuarioId,
+
+        tipo:
+          'nuevo_producto',
+
+        titulo:
+          'Nuevo producto 📦',
+
+        mensaje:
+          `${emprendimiento.nombre} publicó: ${nuevoProducto.nombre}.`,
+
+        referenciaId:
+          nuevoProducto.id,
+
+        referenciaTipo:
+          'producto',
+
+        io,
+      });
+    } catch (
+      errorNotificacion
+    ) {
+      console.error(
+        'ERROR NOTIFICANDO NUEVO PRODUCTO:',
+        errorNotificacion
+      );
+    }
+
     return res.status(201).json({
-      message: 'Producto creado correctamente',
-      producto: resultado.rows[0],
+      message:
+        'Producto creado correctamente',
+
+      producto:
+        nuevoProducto,
     });
   } catch (error) {
     console.error('Error creando producto:', error);

@@ -138,6 +138,123 @@ async function crearNotificacion({
 }
 
 
+
+
+// ============================================================
+// CREAR NOTIFICACIONES PARA TODOS LOS USUARIOS
+//
+// - Permite excluir al usuario que originó el evento.
+// - Reutiliza crearNotificacion(), por lo que conserva:
+//   PostgreSQL + Socket.IO + Firebase Push.
+// - Un fallo individual no cancela el resto de notificaciones.
+// ============================================================
+
+async function crearNotificacionesParaTodos({
+  excluirUsuarioId = null,
+  tipo,
+  titulo,
+  mensaje,
+  referenciaId = null,
+  referenciaTipo = null,
+  io = null,
+}) {
+  let consulta = `
+    SELECT id
+    FROM usuarios
+  `;
+
+  const parametros = [];
+
+  if (
+    excluirUsuarioId !== null &&
+    excluirUsuarioId !== undefined
+  ) {
+    consulta += `
+      WHERE id <> $1
+    `;
+
+    parametros.push(
+      excluirUsuarioId
+    );
+  }
+
+  consulta += `
+    ORDER BY id ASC
+  `;
+
+  const resultadoUsuarios =
+    await pool.query(
+      consulta,
+      parametros
+    );
+
+  const usuarios =
+    resultadoUsuarios.rows;
+
+  if (usuarios.length === 0) {
+    return {
+      total: 0,
+      creadas: 0,
+      fallidas: 0,
+    };
+  }
+
+  const resultados =
+    await Promise.allSettled(
+      usuarios.map(
+        (usuario) =>
+          crearNotificacion({
+            usuarioId:
+              usuario.id,
+
+            tipo,
+
+            titulo,
+
+            mensaje,
+
+            referenciaId,
+
+            referenciaTipo,
+
+            io,
+          })
+      )
+    );
+
+  let creadas = 0;
+  let fallidas = 0;
+
+  for (
+    const resultado
+    of resultados
+  ) {
+    if (
+      resultado.status ===
+      'fulfilled'
+    ) {
+      creadas++;
+    } else {
+      fallidas++;
+
+      console.error(
+        'ERROR CREANDO NOTIFICACIÓN MASIVA:',
+        resultado.reason
+      );
+    }
+  }
+
+  return {
+    total:
+      usuarios.length,
+
+    creadas,
+
+    fallidas,
+  };
+}
+
 module.exports = {
   crearNotificacion,
+  crearNotificacionesParaTodos,
 };

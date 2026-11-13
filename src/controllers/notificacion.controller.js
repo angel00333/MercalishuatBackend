@@ -529,6 +529,8 @@ exports.eliminarTokenFcm =
           .json({
             success:
               false,
+            message:
+              'Falta el FID o el usuario no está autenticado',
           });
       }
 

@@ -1,5 +1,11 @@
 const pool = require('../config/db');
 
+const {
+  crearNotificacionesParaTodos,
+} = require(
+  '../services/notificacion.service'
+);
+
 
 // ============================================
 // CONSULTA BASE DE PUBLICACIÓN
@@ -275,7 +281,9 @@ const crearPublicacion = async (
     const tienda =
         await pool.query(
       `
-      SELECT id
+      SELECT
+        id,
+        nombre
 
       FROM emprendimientos
 
@@ -350,12 +358,57 @@ const crearPublicacion = async (
       ]
     );
 
+    const nuevaPublicacion =
+      resultado.rows[0];
+
+    const nombreEmprendimiento =
+      tienda.rows[0].nombre;
+
+    // ==========================================
+    // NOTIFICAR NUEVA PUBLICACIÓN
+    // ==========================================
+
+    try {
+      const io =
+        req.app?.get?.('io') ||
+        null;
+
+      await crearNotificacionesParaTodos({
+        excluirUsuarioId:
+          usuarioId,
+
+        tipo:
+          'nueva_publicacion',
+
+        titulo:
+          'Nueva publicación 📰',
+
+        mensaje:
+          `${nombreEmprendimiento} acaba de publicar algo nuevo.`,
+
+        referenciaId:
+          nuevaPublicacion.id,
+
+        referenciaTipo:
+          'publicacion',
+
+        io,
+      });
+    } catch (
+      errorNotificacion
+    ) {
+      console.error(
+        'ERROR NOTIFICANDO NUEVA PUBLICACIÓN:',
+        errorNotificacion
+      );
+    }
+
     return res.status(201).json({
       message:
         'Publicación creada correctamente',
 
       publicacion:
-        resultado.rows[0],
+        nuevaPublicacion,
     });
 
   } catch (error) {
