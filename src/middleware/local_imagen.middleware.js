@@ -1,6 +1,9 @@
 const multer =
   require('multer');
 
+const path =
+  require('path');
+
 
 // ============================================================
 // STORAGE EN MEMORIA
@@ -11,7 +14,11 @@ const storage =
 
 
 // ============================================================
-// TIPOS PERMITIDOS
+// TIPOS Y EXTENSIONES PERMITIDOS
+//
+// Android/Web pueden enviar una imagen válida como
+// application/octet-stream. Por eso validamos MIME y, cuando el
+// MIME es genérico, usamos también la extensión original.
 // ============================================================
 
 const tiposPermitidos =
@@ -20,6 +27,14 @@ const tiposPermitidos =
     'image/jpg',
     'image/png',
     'image/webp',
+  ]);
+
+const extensionesPermitidas =
+  new Set([
+    '.jpg',
+    '.jpeg',
+    '.png',
+    '.webp',
   ]);
 
 
@@ -32,21 +47,55 @@ const fileFilter = (
   file,
   cb
 ) => {
+  const mimetype =
+    String(
+      file.mimetype || ''
+    )
+      .trim()
+      .toLowerCase();
+
+  const extension =
+    path
+      .extname(
+        String(
+          file.originalname || ''
+        )
+      )
+      .trim()
+      .toLowerCase();
+
+  const mimeValido =
+    tiposPermitidos.has(
+      mimetype
+    );
+
+  const mimeGenerico =
+    !mimetype ||
+    mimetype ===
+      'application/octet-stream';
+
+  const extensionValida =
+    extensionesPermitidas.has(
+      extension
+    );
+
   if (
-    !tiposPermitidos.has(
-      file.mimetype
+    mimeValido ||
+    (
+      mimeGenerico &&
+      extensionValida
     )
   ) {
     return cb(
-      new Error(
-        'Solo se permiten imágenes JPG, PNG o WEBP'
-      )
+      null,
+      true
     );
   }
 
-  cb(
-    null,
-    true
+  return cb(
+    new Error(
+      'Solo se permiten imágenes JPG, JPEG, PNG o WEBP'
+    )
   );
 };
 
